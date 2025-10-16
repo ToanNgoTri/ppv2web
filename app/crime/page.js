@@ -19,10 +19,13 @@ export default function Home() {
 
   const [fixDataIndex, setFixDataIndex] = useState(null);
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY // chỉ dùng server
-  );
+  // const data = await res.json()
+  // console.log(data)
+
+  // const supabase = createClient(
+  //   process.env.NEXT_PUBLIC_SUPABASE_URL,
+  //   process.env.SUPABASE_SERVICE_ROLE_KEY // chỉ dùng server
+  // );
 
   async function search() {
     let filters = {};
@@ -30,16 +33,27 @@ export default function Home() {
     if (input2 !== "") filters[select2] = input2;
     if (input3 !== "") filters[select3] = input3;
 
-    const { data, error } = await supabase
-      .from("crime")
-      .select("*")
-      .match(filters);
-    // .eq(select1, input1);
-    // .or(`name.ilike.%Nguyen%,name.ilike.%Tran%`);
+    let supabase = await fetch("/api/searchData", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        database: "crime",
+        criteria: filters,
+      }),
+    });
+    // console.log(supabase);
+    const data = await supabase.json();
+    console.log('data',data);
+    
+
+    // const { data, error } = await supabase
+    //   .from("crime")
+    //   .select("*")
+    //   .match(filters);
     setData(data);
-    console.log("data", data);
-    // console.log("filters", filters);
-    // console.log("input1", input1);
+    // console.log("data", data);
   }
 
   function reset() {
@@ -52,30 +66,54 @@ export default function Home() {
   }
 
   async function addData() {
-    const { dataPP, error } = await supabase.from("crime").insert(newData);
-    if (error) {
-      alert("Lỗi thêm dữ liệu: " + error.message);
-    } else {
-      alert("Thêm dữ liệu thành công");
-      setNewData([]);
-      console.log("data", data);
-      console.log("newData", newData);
+    let supabase = await fetch("/api/addData", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        database: "crime",
+        newData,
+      }),
+    });
 
-      setData(data?.length ? [...data, ...newData] : [...newData]);
-    }
+    // let error = await supabase
+
+    // const { dataPP, error } = await supabase.from("crime").insert(newData);
+    // if (error) {
+    //   alert("Lỗi thêm dữ liệu: " + error.message);
+    // } else {
+    alert("Thêm dữ liệu thành công");
+    setNewData([]);
+    console.log("supabase", supabase);
+    console.log("newData", newData);
+
+    setData(data?.length ? [...data, ...newData] : [...newData]);
+    // }
   }
 
   async function deleteData(cccd) {
-    const { dt, error } = await supabase
-      .from("crime")
-      .delete()
-      .eq("CCCD", cccd);
-    if (error) {
-      alert("Lỗi xóa dữ liệu: " + error.message);
-    } else {
-      alert("Xóa dữ liệu thành công");
-      setData(data && data.filter((item) => item.CCCD !== cccd));
-    }
+    let supabase = await fetch("/api/deleteData", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        database: "crime",
+        CCCD: cccd,
+      }),
+    });
+
+    // const { dt, error } = await supabase
+    //   .from("crime")
+    //   .delete()
+    //   .eq("CCCD", cccd);
+    // if (error) {
+    //   alert("Lỗi xóa dữ liệu: " + error.message);
+    // } else {
+    alert("Xóa dữ liệu thành công");
+    setData(data && data.filter((item) => item.CCCD !== cccd));
+    // }
   }
 
   async function fixData(cccd) {
@@ -83,20 +121,35 @@ export default function Home() {
     console.log("data", data);
 
     const fixItem = newFixData;
-    const { dt, error } = await supabase
-      .from("crime")
-      .update(fixItem)
-      .eq("CCCD", cccd);
-    if (error) {
-      alert("Lỗi chỉnh sửa dữ liệu: " + error.message);
-    } else {
-      alert("Chỉnh sửa dữ liệu thành công");
-      const updatedData = data;
-      updatedData[fixDataIndex] = fixItem;
-      setData(updatedData);
-      setFixDataIndex(null);
-      setNewFixData([]);
-    }
+
+    let supabase = await fetch("/api/fixData", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        database: "crime",
+        CCCD: cccd,
+        newData:fixItem
+      }),
+    });
+    // console.log('supabase',supabase);
+    
+
+    // const { dt, error } = await supabase
+    //   .from("crime")
+    //   .update(fixItem)
+    //   .eq("CCCD", cccd);
+    // if (error) {
+    //   alert("Lỗi chỉnh sửa dữ liệu: " + error.message);
+    // } else {
+    alert("Chỉnh sửa dữ liệu thành công");
+    const updatedData = data;
+    updatedData[fixDataIndex] = fixItem;
+    setData(updatedData);
+    setFixDataIndex(null);
+    setNewFixData([]);
+    // }
   }
 
   useEffect(() => {
@@ -210,6 +263,11 @@ export default function Home() {
               <option value="TENCHA">TÊN CHA</option>
               <option value="TENME">TÊN MẸ</option>
               <option value="SOHOK">SỐ HSHK</option>
+              <option value="CHARGE">TỘI DANH</option>
+              <option value="JUDGMENT">HÌNH PHẠT</option>
+              <option value="DETENTION">NƠI CHẤP HÀNH</option>
+              <option value="DAYARRES">NGÀY BẮT</option>
+              <option value="FREEDAY">NGÀY CHẤP HÀNH XONG</option>
             </select>
             <input
               style={{ padding: 10, fontSize: 16, marginLeft: 20 }}
@@ -375,7 +433,55 @@ export default function Home() {
                   textAlign: "center",
                 }}
               >
-                QUAN HỆ CH
+                TỘI DANH
+              </td>
+              <td
+                style={{
+                  borderWidth: 1,
+                  borderColor: "white",
+                  borderStyle: "solid",
+                  padding: 5,
+                  width: 50,
+                  textAlign: "center",
+                }}
+              >
+                HÌNH PHẠT
+              </td>
+              <td
+                style={{
+                  borderWidth: 1,
+                  borderColor: "white",
+                  borderStyle: "solid",
+                  padding: 5,
+                  width: 50,
+                  textAlign: "center",
+                }}
+              >
+                NƠI CHẤP HÀNH
+              </td>
+              <td
+                style={{
+                  borderWidth: 1,
+                  borderColor: "white",
+                  borderStyle: "solid",
+                  padding: 5,
+                  width: 50,
+                  textAlign: "center",
+                }}
+              >
+                NGÀY BẮT
+              </td>
+              <td
+                style={{
+                  borderWidth: 1,
+                  borderColor: "white",
+                  borderStyle: "solid",
+                  padding: 5,
+                  width: 50,
+                  textAlign: "center",
+                }}
+              >
+                NGÀY CHẤP HÀNH XONG
               </td>
               <td
                 style={{
@@ -666,11 +772,131 @@ export default function Home() {
                           width: "100%",
                           height: 40,
                         }}
-                        value={newFixData.QUANHE}
+                        value={newFixData.CHARGE}
                         onChange={(e) => {
                           setNewFixData(
                             data.map((d, ii) =>
-                              i === ii ? { ...d, QUANHE: e.target.value } : d
+                              i === ii ? { ...d, CHARGE: e.target.value } : d
+                            )[i]
+                          );
+                        }}
+                      ></input>
+                    </td>
+                    <td
+                      style={{
+                        borderWidth: 1,
+                        borderColor: "white",
+                        borderStyle: "solid",
+                      }}
+                    >
+                      <input
+                        style={{
+                          padding: 5,
+                          fontSize: 12,
+                          width: "100%",
+                          height: 40,
+                        }}
+                        value={newFixData.JUDGMENT}
+                        onChange={(e) => {
+                          setNewFixData(
+                            data.map((d, ii) =>
+                              i === ii ? { ...d, JUDGMENT: e.target.value } : d
+                            )[i]
+                          );
+                        }}
+                      ></input>
+                    </td>
+                    <td
+                      style={{
+                        borderWidth: 1,
+                        borderColor: "white",
+                        borderStyle: "solid",
+                      }}
+                    >
+                      <input
+                        style={{
+                          padding: 5,
+                          fontSize: 12,
+                          width: "100%",
+                          height: 40,
+                        }}
+                        value={newFixData.DETENTION}
+                        onChange={(e) => {
+                          setNewFixData(
+                            data.map((d, ii) =>
+                              i === ii ? { ...d, DETENTION: e.target.value } : d
+                            )[i]
+                          );
+                        }}
+                      ></input>
+                    </td>
+                    <td
+                      style={{
+                        borderWidth: 1,
+                        borderColor: "white",
+                        borderStyle: "solid",
+                      }}
+                    >
+                      <input
+                        style={{
+                          padding: 5,
+                          fontSize: 12,
+                          width: "100%",
+                          height: 40,
+                        }}
+                        value={newFixData.DETENTION}
+                        onChange={(e) => {
+                          setNewFixData(
+                            data.map((d, ii) =>
+                              i === ii ? { ...d, DETENTION: e.target.value } : d
+                            )[i]
+                          );
+                        }}
+                      ></input>
+                    </td>
+                    <td
+                      style={{
+                        borderWidth: 1,
+                        borderColor: "white",
+                        borderStyle: "solid",
+                      }}
+                    >
+                      <input
+                        style={{
+                          padding: 5,
+                          fontSize: 12,
+                          width: "100%",
+                          height: 40,
+                        }}
+                        value={newFixData.DAYARRES}
+                        onChange={(e) => {
+                          setNewFixData(
+                            data.map((d, ii) =>
+                              i === ii ? { ...d, DAYARRES: e.target.value } : d
+                            )[i]
+                          );
+                        }}
+                      ></input>
+                    </td>
+                    <td
+                      style={{
+                        borderWidth: 1,
+                        borderColor: "white",
+                        borderStyle: "solid",
+                      }}
+                    >
+                      <input
+                        style={{
+                          padding: 5,
+                          fontSize: 12,
+                          width: "100%",
+                          height: 40,
+                        }}
+                        value={newFixData.FREEDAY}
+                        onChange={(e) => {
+                          setNewFixData(
+                            data.map((d, ii) =>
+                              i === ii ? { ...d, FREEDAY: e.target.value } : d
                             )[i]
                           );
                         }}
@@ -853,7 +1079,47 @@ export default function Home() {
                         padding: 5,
                       }}
                     >
-                      {item.QUANHE}
+                      {item.CHARGE}
+                    </td>
+                    <td
+                      style={{
+                        borderWidth: 1,
+                        borderColor: "white",
+                        borderStyle: "solid",
+                        padding: 5,
+                      }}
+                    >
+                      {item.JUDGMENT}
+                    </td>
+                    <td
+                      style={{
+                        borderWidth: 1,
+                        borderColor: "white",
+                        borderStyle: "solid",
+                        padding: 5,
+                      }}
+                    >
+                      {item.DETENTION}
+                    </td>
+                    <td
+                      style={{
+                        borderWidth: 1,
+                        borderColor: "white",
+                        borderStyle: "solid",
+                        padding: 5,
+                      }}
+                    >
+                      {item.DAYARRES}
+                    </td>
+                    <td
+                      style={{
+                        borderWidth: 1,
+                        borderColor: "white",
+                        borderStyle: "solid",
+                        padding: 5,
+                      }}
+                    >
+                      {item.FREEDAY}
                     </td>
                     <td
                       style={{
@@ -1160,7 +1426,102 @@ export default function Home() {
                         );
                       }}
                     ></input>
-                  </td>{" "}
+                  </td>
+                  <td
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "white",
+                      borderStyle: "solid",
+                    }}
+                  >
+                    <input
+                      style={{ padding: 5, fontSize: 12, width: "100%" }}
+                      value={newData.CHARGE}
+                      onChange={(e) => {
+                        setNewData(
+                          newData.map((d, i) =>
+                            i === index ? { ...d, CHARGE: e.target.value } : d
+                          )
+                        );
+                      }}
+                    ></input>
+                  </td>
+                  <td
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "white",
+                      borderStyle: "solid",
+                    }}
+                  >
+                    <input
+                      style={{ padding: 5, fontSize: 12, width: "100%" }}
+                      value={newData.JUDGMENT}
+                      onChange={(e) => {
+                        setNewData(
+                          newData.map((d, i) =>
+                            i === index ? { ...d, JUDGMENT: e.target.value } : d
+                          )
+                        );
+                      }}
+                    ></input>
+                  </td>
+                  <td
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "white",
+                      borderStyle: "solid",
+                    }}
+                  >
+                    <input
+                      style={{ padding: 5, fontSize: 12, width: "100%" }}
+                      value={newData.DETENTION}
+                      onChange={(e) => {
+                        setNewData(
+                          newData.map((d, i) =>
+                            i === index ? { ...d, DETENTION: e.target.value } : d
+                          )
+                        );
+                      }}
+                    ></input>
+                  </td>
+                  <td
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "white",
+                      borderStyle: "solid",
+                    }}
+                  >
+                    <input
+                      style={{ padding: 5, fontSize: 12, width: "100%" }}
+                      value={newData.DAYARRES}
+                      onChange={(e) => {
+                        setNewData(
+                          newData.map((d, i) =>
+                            i === index ? { ...d, DAYARRES: e.target.value } : d
+                          )
+                        );
+                      }}
+                    ></input>
+                  </td>
+                  <td
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "white",
+                      borderStyle: "solid",
+                    }}
+                  >
+                    <input
+                      style={{ padding: 5, fontSize: 12, width: "100%" }}
+                      value={newData.FREEDAY}
+                      onChange={(e) => {
+                        setNewData(
+                          newData.map((d, i) =>
+                            i === index ? { ...d, FREEDAY: e.target.value } : d
+                          )
+                        );
+                      }}
+                    ></input>
+                  </td>
                   <button
                     style={{
                       padding: 5,
@@ -1193,7 +1554,11 @@ export default function Home() {
                   SOHOK: "",
                   NOITHTRU: "",
                   TENCHA: "",
-                  TENME: "",
+                  CHARGE: "",
+                  JUDGMENT: "",
+                  DETENTION: "",
+                  DAYARRES: "",
+                  FREEDAY: "",
                 },
               ])
             }

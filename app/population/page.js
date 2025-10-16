@@ -19,27 +19,40 @@ export default function Home() {
 
   const [fixDataIndex, setFixDataIndex] = useState(null);
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY // chỉ dùng server
-  );
+  // const supabase = createClient(
+  //   process.env.NEXT_PUBLIC_SUPABASE_URL,
+  //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY // chỉ dùng server
+  // );
 
   async function search() {
-    let filters = {};
+
+        let filters = {};
     if (input1 !== "") filters[select1] = input1;
     if (input2 !== "") filters[select2] = input2;
     if (input3 !== "") filters[select3] = input3;
 
-    const { data, error } = await supabase
-      .from("population")
-      .select("*")
-      .match(filters);
-    // .eq(select1, input1);
-    // .or(`name.ilike.%Nguyen%,name.ilike.%Tran%`);
+
+    let supabase  = await fetch('/api/searchData',{
+       method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      database:'population',
+      criteria:filters
+    }),
+  
+    })
+    // console.log(supabase);
+    const data = await supabase.json()
+    
+
+    // const { data, error } = await supabase
+    //   .from("crime")
+    //   .select("*")
+    //   .match(filters);
     setData(data);
-    console.log("data", data);
-    console.log("filters", filters);
-    console.log("input1", input1);
+    // console.log("data", data);
   }
 
   function reset() {
@@ -52,30 +65,42 @@ export default function Home() {
   }
 
   async function addData() {
-    const { dataPP, error } = await supabase.from("population").insert(newData);
-    if (error) {
-      alert("Lỗi thêm dữ liệu: " + error.message);
-    } else {
-      alert("Thêm dữ liệu thành công");
+    let supabase  = await fetch('/api/addData',{
+       method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      database:'population',
+      newData
+    }),
+  
+    })
+
+    alert("Thêm dữ liệu thành công");
       setNewData([]);
       console.log("data", data);
       console.log("newData", newData);
 
       setData(data?.length ? [...data, ...newData] : [...newData]);
-    }
+    
   }
 
   async function deleteData(cccd) {
-    const { dt, error } = await supabase
-      .from("population")
-      .delete()
-      .eq("CCCD", cccd);
-    if (error) {
-      alert("Lỗi xóa dữ liệu: " + error.message);
-    } else {
+        let supabase  = await fetch('/api/deleteData',{
+       method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      database:'population',
+      CCCD:cccd
+    }),
+  
+    })
       alert("Xóa dữ liệu thành công");
       setData(data && data.filter((item) => item.CCCD !== cccd));
-    }
+    
   }
 
   async function fixData(cccd) {
@@ -83,20 +108,24 @@ export default function Home() {
     console.log("data", data);
 
     const fixItem = newFixData;
-    const { dt, error } = await supabase
-      .from("population")
-      .update(fixItem)
-      .eq("CCCD", cccd);
-    if (error) {
-      alert("Lỗi chỉnh sửa dữ liệu: " + error.message);
-    } else {
-      alert("Chỉnh sửa dữ liệu thành công");
+    let supabase = await fetch("/api/fixData", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        database: "population",
+        CCCD: cccd,
+        newData:fixItem
+      }),
+    });
+
+    alert("Chỉnh sửa dữ liệu thành công");
       const updatedData = data;
       updatedData[fixDataIndex] = fixItem;
       setData(updatedData);
       setFixDataIndex(null);
       setNewFixData([]);
-    }
   }
 
   useEffect(() => {
