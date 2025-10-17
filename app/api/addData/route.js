@@ -6,8 +6,15 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(res) {
+  try{
   const body = await res.json()
   const { data, error } = await supabaseAdmin.from(body.database).insert(body.newData)
-  if (error) return Response.json({ error }, { status: 400 })
-  return Response.json(error)
+    if (error) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+
+    return Response.json({ data }, { status: 200 });
+  } catch (err) {
+    return Response.json({ error: err.message }, { status: 500 });
+  }
 }

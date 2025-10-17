@@ -6,108 +6,128 @@ import { useState, useEffect } from "react";
 
 export default function Home() {
   const [data, setData] = useState([]);
-  const [input1, setinput1] = useState("");
-  const [input2, setinput2] = useState("");
-  const [input3, setinput3] = useState("");
+  const [input1, setInput1] = useState("");
+  const [input2, setInput2] = useState("");
+  const [input3, setInput3] = useState("");
 
   const [select1, setSelect1] = useState("HOTEN");
   const [select2, setSelect2] = useState("HOTEN");
   const [select3, setSelect3] = useState("HOTEN");
 
-  const [newData, setNewData] = useState([]);
+  const [newData, setNewData] = useState(null);
   const [newFixData, setNewFixData] = useState([]);
 
   const [fixDataIndex, setFixDataIndex] = useState(null);
 
-  // const supabase = createClient(
-  //   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  //   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY // chỉ dùng server
-  // );
+  const title = {
+    HOTEN: "HỌ TÊN",
+    GIOITINH: "GIỚI TÍNH",
+    NAMSINH: "NĂM SINH",
+    QUANHE: "QUAN HỆ VỚI CH",
+    SOHOK: "SỐ HSHK",
+    CCCD: "CCCD",
+    DANTOC: "DÂN TỘC",
+    TONGIAO: "TÔN GIÁO",
+    NOITHTRU: "ĐỊA CHỈ",
+    TENCHA: "TÊN CHA",
+    TENME: "TÊN MẸ",
+  };
 
-  async function search() {
+async function search() {
+  try {
+    // 👉 Gom các điều kiện có giá trị
+    const filters = {};
+    if (input1.trim()) filters[select1] = input1.trim();
+    if (input2.trim()) filters[select2] = input2.trim();
+    if (input3.trim()) filters[select3] = input3.trim();
 
-        let filters = {};
-    if (input1 !== "") filters[select1] = input1;
-    if (input2 !== "") filters[select2] = input2;
-    if (input3 !== "") filters[select3] = input3;
+    if (Object.keys(filters).length === 0) {
+      alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
+      return;
+    }
 
+    // 👉 Gửi request tới API
+    const res = await fetch("/api/searchData", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        database: "population",
+        criteria: filters,
+        fuzzy: true, // 🔍 tìm gần đúng
+      }),
+    });
 
-    let supabase  = await fetch('/api/searchData',{
-       method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      database:'population',
-      criteria:filters
-    }),
-  
-    })
-    // console.log(supabase);
-    const data = await supabase.json()
-    
+    if (!res.ok) throw new Error("Không thể kết nối máy chủ");
 
-    // const { data, error } = await supabase
-    //   .from("crime")
-    //   .select("*")
-    //   .match(filters);
-    setData(data);
-    // console.log("data", data);
+    const data = await res.json();
+
+    // 👉 Cập nhật dữ liệu kết quả
+    setFixDataIndex(null);
+    setData(Array.isArray(data) ? data : []);
+  } catch (error) {
+    console.error("Lỗi tìm kiếm:", error);
+    alert("Đã xảy ra lỗi trong quá trình tìm kiếm!");
   }
+}
 
   function reset() {
-    setinput1("");
-    setinput2("");
-    setinput3("");
+    setInput1("");
+    setInput2("");
+    setInput3("");
     setSelect1("HOTEN");
     setSelect2("HOTEN");
     setSelect3("HOTEN");
   }
 
   async function addData() {
-    let supabase  = await fetch('/api/addData',{
-       method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      database:'population',
-      newData
-    }),
-  
-    })
+    let newDataConvert = newData;
+
+    newDataConvert["GIOITINH"] =
+      newDataConvert["GIOITINH"] == "NAM" ? true : false;
+
+    let supabase = await fetch("/api/addData", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        database: "population",
+        newData: newDataConvert,
+      }),
+    });
 
     alert("Thêm dữ liệu thành công");
-      setNewData([]);
-      console.log("data", data);
-      console.log("newData", newData);
-
-      setData(data?.length ? [...data, ...newData] : [...newData]);
+    const result = await supabase.json();
+    console.log("result", result);
+    console.log("newDataConvert", newDataConvert);
     
+    setData(data?.length ? [...data, ...[newData]] : [newData]);
+    setNewData(null);
   }
 
   async function deleteData(cccd) {
-        let supabase  = await fetch('/api/deleteData',{
-       method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      database:'population',
-      CCCD:cccd
-    }),
-  
-    })
-      alert("Xóa dữ liệu thành công");
-      setData(data && data.filter((item) => item.CCCD !== cccd));
-    
+    let supabase = await fetch("/api/deleteData", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        database: "population",
+        CCCD: cccd,
+      }),
+    });
+    alert("Xóa dữ liệu thành công");
+    setData(data && data.filter((item) => item.CCCD !== cccd));
   }
 
   async function fixData(cccd) {
     if (fixDataIndex === null) return;
     console.log("data", data);
 
-    const fixItem = newFixData;
+    let fixItem = newFixData;
+
+    fixItem["GIOITINH"] = fixItem["GIOITINH"] == "NAM" ? true : false;
+
     let supabase = await fetch("/api/fixData", {
       method: "POST",
       headers: {
@@ -116,1192 +136,409 @@ export default function Home() {
       body: JSON.stringify({
         database: "population",
         CCCD: cccd,
-        newData:fixItem
+        newData: fixItem,
       }),
     });
 
     alert("Chỉnh sửa dữ liệu thành công");
-      const updatedData = data;
-      updatedData[fixDataIndex] = fixItem;
-      setData(updatedData);
-      setFixDataIndex(null);
-      setNewFixData([]);
+    const updatedData = data;
+    updatedData[fixDataIndex] = fixItem;
+    setData(updatedData);
+    setFixDataIndex(null);
+    setNewFixData([]);
   }
 
-  useEffect(() => {
-    console.log("fixDataIndex", fixDataIndex);
-    console.log("newFixData", newFixData);
-  });
-
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <div
-          style={{
-            marginBottom: 20,
-            flexDirection: "column",
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#0f172a",
+        color: "white",
+        padding: 30,
+        fontFamily: "Segoe UI, sans-serif",
+      }}
+    >
+      <main
+        style={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        {/* TIÊU ĐỀ */}
+        <div style={{ marginBottom: 30, textAlign: "center" }}>
           <div
-            style={{ marginBottom: 20, fontSize: 40, fontFamily: "cursive" }}
+            style={{
+              fontSize: 36,
+              fontWeight: "bold",
+              fontFamily: "cursive",
+              color: "#93c5fd",
+              marginBottom: 10,
+            }}
           >
             CÔNG CỤ TÌM KIẾM DÂN CƯ
           </div>
-          <div
-            style={{
-              marginBottom: 20,
-              flexDirection: "row",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <label>Chọn Dữ liệu:</label>
-            <select
-              value={select1}
-              style={{ padding: 10, fontSize: 16, marginLeft: 20 }}
-              onChange={(e) => setSelect1(e.target.value.toUpperCase())}
-            >
-              <option value="HOTEN" defaultValue={"HOTEN"}>
-                HỌ VÀ TÊN
-              </option>
-              <option value="NAMSINH">NGÀY SINH</option>
-              <option value="NOITHTRU">NƠI THƯỜNG TRÚ</option>
-              <option value="DANTOC">DÂN TỘC</option>
-              <option value="TONGIAO">TÔN GIÁO</option>
-              <option value="CCCD">CCCD</option>
-              <option value="TENCHA">TÊN CHA</option>
-              <option value="TENME">TÊN MẸ</option>
-              <option value="SOHOK">SỐ HSHK</option>
-            </select>
-            <input
-            
-              
-              style={{ padding: 10, fontSize: 16, marginLeft: 20,textTransform: "uppercase"  }}
-              value={input1}
-              onChange={(e) => setinput1(e.target.value.toUpperCase())}
-              placeholder="Họ và tên"
-            />
-          </div>
-          <div
-            style={{
-              marginBottom: 20,
-              flexDirection: "row",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <label>Chọn Dữ liệu:</label>
-            <select
-              value={select2}
-              style={{ padding: 10, fontSize: 16, marginLeft: 20 }}
-              onChange={(e) => setSelect2(e.target.value.toUpperCase())}
-            >
-              <option value="HOTEN">HỌ VÀ TÊN</option>
-              <option value="NAMSINH">NGÀY SINH</option>
-              <option value="NOITHTRU">NƠI THƯỜNG TRÚ</option>
-              <option value="DANTOC">DÂN TỘC</option>
-              <option value="TONGIAO">TÔN GIÁO</option>
-              <option value="TENCHA">TÊN CHA</option>
-              <option value="TENME">TÊN MẸ</option>
-              <option value="SOHOK">SỐ HSHK</option>
-            </select>
-            <input
-              style={{ padding: 10, fontSize: 16, marginLeft: 20 }}
-              value={input2}
-              onChange={(e) => setinput2(e.target.value.toUpperCase())}
-              placeholder="Năm sinh"
-            />
-          </div>
-          <div
-            style={{
-              marginBottom: 20,
-              flexDirection: "row",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            <label>Chọn Dữ liệu:</label>
-            <select
-              value={select3}
-              style={{ padding: 10, fontSize: 16, marginLeft: 20 }}
-              onChange={(e) => setSelect3(e.target.value.toUpperCase())}
-            >
-              <option value="HOTEN">HỌ VÀ TÊN</option>
-              <option value="NAMSINH">NGÀY SINH</option>
-              <option value="NOITHTRU">NƠI THƯỜNG TRÚ</option>
-              <option value="DANTOC">DÂN TỘC</option>
-              <option value="TONGIAO">TÔN GIÁO</option>
-              <option value="TENCHA">TÊN CHA</option>
-              <option value="TENME">TÊN MẸ</option>
-              <option value="SOHOK">SỐ HSHK</option>
-            </select>
-            <input
-              style={{ padding: 10, fontSize: 16, marginLeft: 20 }}
-              value={input3}
-              onChange={(e) => setinput3(e.target.value.toUpperCase())}
-              placeholder="Số hộ khẩu"
-            />
-          </div>
         </div>
-        <div style={{ justifyContent: "center", display: "flex" }}>
-          <button onClick={() => reset()}>Xóa dữ liệu</button>
 
+        {/* FORM TÌM KIẾM */}
+        {[1, 2, 3].map((num) => {
+          const currentTitle =
+            num === 1 ? select1 : num === 2 ? select2 : select3;
+          const currentInput = num === 1 ? input1 : num === 2 ? input2 : input3;
+          const setCurrentInput =
+            num === 1 ? setInput1 : num === 2 ? setInput2 : setInput3;
+
+          return (
+            <div
+              key={num}
+              style={{
+                marginBottom: 15,
+                display: "flex",
+                alignItems: "center",
+                gap: 15,
+              }}
+            >
+              <label style={{ minWidth: 100 }}>Chọn Dữ liệu:</label>
+              <select
+                value={currentTitle}
+                style={{
+                  padding: 8,
+                  fontSize: 15,
+                  borderRadius: 6,
+                  backgroundColor: "#1e293b",
+                  color: "white",
+                  border: "1px solid #475569",
+                }}
+                onChange={(e) => {
+                  if (num === 1) setSelect1(e.target.value);
+                  if (num === 2) setSelect2(e.target.value);
+                  if (num === 3) setSelect3(e.target.value);
+                }}
+              >
+                {Object.keys(title).map((item) => (
+                  <option key={item} value={item}>
+                    {title[item]}
+                  </option>
+                ))}
+              </select>
+              <input
+                style={{
+                  padding: 8,
+                  fontSize: 15,
+                  borderRadius: 6,
+                  border: "1px solid #475569",
+                  backgroundColor: "#0f172a",
+                  color: "white",
+                  width: 250,
+                }}
+                value={currentInput}
+                onChange={(e) => setCurrentInput(e.target.value.toUpperCase())}
+                placeholder="NHẬP THÔNG TIN"
+              />
+            </div>
+          );
+        })}
+
+        {/* NÚT TÌM & RESET */}
+        <div style={{ display: "flex", gap: 20, marginTop: 10 }}>
           <button
+            onClick={() => reset()}
             style={{
-              padding: 10,
-              fontSize: 16,
-              backgroundColor: "blue",
+              backgroundColor: "#475569",
+              padding: "10px 18px",
               color: "white",
-              borderRadius: 5,
+              fontSize: 15,
+              borderRadius: 6,
               cursor: "pointer",
-              marginLeft: 20,
+              border: "none",
             }}
+          >
+            Xóa dữ liệu
+          </button>
+          <button
             onClick={() => search()}
+            style={{
+              padding: "10px 18px",
+              fontSize: 15,
+              backgroundColor: "#2563eb",
+              color: "white",
+              borderRadius: 6,
+              cursor: "pointer",
+              border: "none",
+            }}
           >
             Tìm kiếm
           </button>
         </div>
-        <div style={{ marginTop: 20, marginBottom: 20 }}>
+
+        {/* KẾT QUẢ */}
+        <div style={{ marginTop: 25, marginBottom: 10 }}>
           Tìm thấy {data && data.length} kết quả
         </div>
-        <table>
-          <tbody>
-            <tr>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                }}
-              >
-                STT
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  textAlign: "center",
-                }}
-              >
-                Họ và tên
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  textAlign: "center",
-                }}
-              >
-                NGÀY SINH
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  width: 30,
-                  textAlign: "center",
-                }}
-              >
-                GIỚI TÍNH
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  textAlign: "center",
-                }}
-              >
-                DÂN TỘC
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  textAlign: "center",
-                }}
-              >
-                TÔN GIÁO
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  textAlign: "center",
-                }}
-              >
-                CCCD
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  textAlign: "center",
-                }}
-              >
-                NƠI THƯỜNG TRÚ
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  textAlign: "center",
-                }}
-              >
-                TÊN CHA
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  textAlign: "center",
-                }}
-              >
-                TÊN MẸ
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  width: 30,
-                  textAlign: "center",
-                }}
-              >
-                SOHOK
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  width: 50,
-                  textAlign: "center",
-                }}
-              >
-                QUAN HỆ CH
-              </td>
-              <td
-                style={{
-                  borderWidth: 1,
-                  borderColor: "white",
-                  borderStyle: "solid",
-                  padding: 5,
-                  width: 50,
-                  textAlign: "center",
-                }}
-              >
-                Chức năng
-              </td>
-            </tr>
 
+        {/* BẢNG */}
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            backgroundColor: "#1e293b",
+            borderRadius: 10,
+            overflow: "hidden",
+          }}
+        >
+          <thead>
+            <tr style={{ backgroundColor: "#334155" }}>
+              <th style={{ padding: 10, border: "1px solid #475569" }}>STT</th>
+              {Object.keys(title).map((item) => (
+                <th
+                  key={item}
+                  style={{ padding: 10, border: "1px solid #475569" }}
+                >
+                  {title[item]}
+                </th>
+              ))}
+              <th style={{ padding: 10, border: "1px solid #475569" }}>
+                Chức năng
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
             {data &&
               data.map((item, i) =>
                 fixDataIndex == i ? (
-                  <tr key={i}>
+                  <tr key={i} style={{ backgroundColor: "#0f172a" }}>
                     <td
                       style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
+                        border: "1px solid #475569",
                         textAlign: "center",
+                        padding: 8,
                       }}
                     >
                       {i + 1}
                     </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
+                    {Object.keys(title).map((key) => (
+                      <td
+                        key={key}
                         style={{
+                          border: "1px solid #475569",
                           padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.HOTEN}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii ? { ...d, HOTEN: e.target.value.toUpperCase() } : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.NAMSINH}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii ? { ...d, NAMSINH: e.target.value.toUpperCase() } : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.GIOITINH}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii
-                                ? {
-                                    ...d,
-                                    GIOITINH: e.target.value.toUpperCase().match(/nam/gim)
-                                      ? true
-                                      : false,
-                                  }
-                                : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.DANTOC}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii ? { ...d, DANTOC: e.target.value.toUpperCase() } : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.TONGIAO}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii ? { ...d, TONGIAO: e.target.value.toUpperCase() } : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.CCCD}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii ? { ...d, CCCD: e.target.value.toUpperCase() } : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.NOITHTRU}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii ? { ...d, NOITHTRU: e.target.value.toUpperCase() } : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.TENCHA}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii ? { ...d, TENCHA: e.target.value.toUpperCase() } : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.TENME}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii ? { ...d, TENME: e.target.value.toUpperCase() } : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.SOHOK}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii ? { ...d, SOHOK: e.target.value.toUpperCase() } : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          height: 40,
-                        }}
-                        value={newFixData.QUANHE}
-                        
-                        onChange={(e) => {
-                          setNewFixData(
-                            data.map((d, ii) =>
-                              i === ii ? { ...d, QUANHE: e.target.value.toUpperCase() } : d
-                            )[i]
-                          );
-                        }}
-                      ></input>
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "row",
                         }}
                       >
-                        <button
-                          style={{
-                            fontSize: 12,
-                            backgroundColor: "blue",
-                            color: "white",
-                            borderRadius: 5,
-                            cursor: "pointer",
-                            marginRight: 5,
-                            width: 70,
-                          }}
-                          onClick={() => setFixDataIndex(i)}
-                        >
-                          Chỉnh sửa
-                        </button>
-                        <button
+                        <input
                           style={{
                             padding: 5,
                             fontSize: 12,
-                            backgroundColor: "red",
+                            width: "100%",
+                            backgroundColor: "#1e293b",
                             color: "white",
-                            borderRadius: 5,
-                            cursor: "pointer",
-                            width: 70,
+                            border: "none",
+                            borderRadius: 4,
                           }}
-                          onClick={() => deleteData(item.CCCD)}
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    </td>
-                    <td>
-                      {fixDataIndex == i && (
-                        <div>
-                          <button
-                            onClick={() => fixData(data[fixDataIndex].CCCD)}
-                          >
-                            Xác nhận chỉnh sửa
-                          </button>
-                        </div>
-                      )}
+                          value={newFixData[key]}
+                          onChange={(e) => {
+                            setNewFixData(
+                              data.map((d, ii) =>
+                                i === ii
+                                  ? {
+                                      ...d,
+                                      [key]: e.target.value.toUpperCase(),
+                                    }
+                                  : d
+                              )[i]
+                            );
+                          }}
+                        />
+                      </td>
+                    ))}
+                    <td
+                      style={{
+                        border: "1px solid #475569",
+                        textAlign: "center",
+                        padding: 8,
+                      }}
+                    >
+                      <button
+                        onClick={() => fixData(data[fixDataIndex].CCCD)}
+                        style={{
+                          backgroundColor: "#22c55e",
+                          color: "white",
+                          border: "none",
+                          borderRadius: 5,
+                          padding: "6px 12px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Lưu
+                      </button>
                     </td>
                   </tr>
                 ) : (
-                  <tr key={i}>
+                  <tr
+                    key={i}
+                    style={{
+                      backgroundColor: i % 2 === 0 ? "#1e293b" : "#0f172a",
+                    }}
+                  >
                     <td
                       style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
+                        border: "1px solid #475569",
                         textAlign: "center",
+                        padding: 8,
                       }}
                     >
                       {i + 1}
                     </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.HOTEN}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.NAMSINH}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.GIOITINH ? "Nam" : "Nữ"}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.DANTOC}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.TONGIAO}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.CCCD}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.NOITHTRU}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.TENCHA}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.TENME}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.SOHOK}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      {item.QUANHE}
-                    </td>
-                    <td
-                      style={{
-                        borderWidth: 1,
-                        borderColor: "white",
-                        borderStyle: "solid",
-                        padding: 5,
-                      }}
-                    >
-                      <div
+                    {Object.keys(title).map((key) => (
+                      <td
+                        key={key}
                         style={{
-                          display: "flex",
-                          flexDirection: "row",
+                          border: "1px solid #475569",
+                          textAlign: "center",
+                          padding: 8,
                         }}
                       >
-                        <button
-                          style={{
-                            fontSize: 12,
-                            backgroundColor: "blue",
-                            color: "white",
-                            borderRadius: 5,
-                            cursor: "pointer",
-                            marginRight: 5,
-                            width: 70,
-                          }}
-                          onClick={() => {
-                            setFixDataIndex(i);
-                            setNewFixData({ ...item });
-                          }}
-                        >
-                          Chỉnh sửa
-                        </button>
-                        <button
-                          style={{
-                            padding: 5,
-                            fontSize: 12,
-                            backgroundColor: "red",
-                            color: "white",
-                            borderRadius: 5,
-                            cursor: "pointer",
-                            width: 70,
-                          }}
-                          onClick={() => deleteData(item.CCCD)}
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    </td>
-                    <td>
-                      {fixDataIndex == i && (
-                        <div>
-                          <button
-                            onClick={() =>
-                              setNewData([
-                                {
-                                  HOTEN: "",
-                                  NAMSINH: "",
-                                  GIOITINH: "",
-                                  DANTOC: "",
-                                  TONGIAO: "",
-                                  CCCD: "",
-                                  SOHOK: "",
-                                  NOITHTRU: "",
-                                  TENCHA: "",
-                                  TENME: "",
-                                },
-                              ])
-                            }
-                          >
-                            Xác nhận chỉnh sửa
-                          </button>
-                        </div>
-                      )}
+                        {key == "GIOITINH"
+                          ? item[key]
+                            ? "Nam"
+                            : "Nữ"
+                          : item[key]}
+                      </td>
+                    ))}
+                    <td
+                      style={{
+                        border: "1px solid #475569",
+                        textAlign: "center",
+                        padding: 8,
+                      }}
+                    >
+                      <button
+                        onClick={() => {
+                          setFixDataIndex(i);
+                          setNewFixData({ ...item });
+                        }}
+                        style={{
+                          backgroundColor: "#3b82f6",
+                          color: "white",
+                          border: "none",
+                          borderRadius: 5,
+                          padding: "6px 10px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        onClick={() => deleteData(item.CCCD)}
+                        style={{
+                          backgroundColor: "#ef4444",
+                          color: "white",
+                          border: "none",
+                          borderRadius: 5,
+                          padding: "6px 10px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Xóa
+                      </button>
                     </td>
                   </tr>
                 )
               )}
 
-            {newData &&
-              newData.map((item, index) => (
-                <tr key={index}>
+            {/* THÊM DỮ LIỆU */}
+            {newData &&       
+                <tr style={{ backgroundColor: "#0f172a" }}>
                   <td
                     style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                      padding: 5,
+                      border: "1px solid #475569",
+                      textAlign: "center",
+                      padding: 8,
                     }}
                   >
                     {data && data.length + 1}
                   </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                      style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-                      value={newData.HOTEN}
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index ? { ...d, HOTEN: e.target.value.toUpperCase() } : d
-                          )
-                        );
+                  {Object.keys(title).map((key) => (
+                    <td
+                      key={key}
+                      style={{
+                        border: "1px solid #475569",
+                        padding: 5,
                       }}
-                    ></input>
-                  </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                      style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-                      value={newData.NAMSINH}
-                      
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index ? { ...d, NAMSINH: e.target.value.toUpperCase() } : d
-                          )
-                        );
+                    >
+                      <input
+                        style={{
+                          padding: 5,
+                          fontSize: 12,
+                          width: "100%",
+                          backgroundColor: "#1e293b",
+                          color: "white",
+                          border: "none",
+                          borderRadius: 4,
+                          textTransform: "uppercase",
+                        }}
+                        value={newData[key]}
+                        onChange={(e) => {
+                          setNewData({
+                            ...newData,
+                            [key]: e.target.value.toUpperCase(),
+                          });
+                        }}
+                      />
+                    </td>
+                  ))}
+                  <td style={{ textAlign: "center", padding: 8 }}>
+                    <button
+                      style={{
+                        backgroundColor: "#10b981",
+                        color: "white",
+                        border: "none",
+                        borderRadius: 5,
+                        padding: "6px 12px",
+                        cursor: "pointer",
                       }}
-                    ></input>
+                      onClick={() => addData()}
+                    >
+                      Thêm
+                    </button>
                   </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                                           style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-
-                      value={newData.GIOITINH}
-                      
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index
-                              ? {
-                                  ...d,
-                                  GIOITINH: e.target.value.toUpperCase().match(/nam/gim)
-                                    ? true
-                                    : false,
-                                }
-                              : d
-                          )
-                        );
-                      }}
-                    ></input>
-                  </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                                           style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-
-                      value={newData.DANTOC}
-                      
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index ? { ...d, DANTOC: e.target.value.toUpperCase() } : d
-                          )
-                        );
-                      }}
-                    ></input>
-                  </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                                           style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-
-                      value={newData.TONGIAO}
-                      
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index ? { ...d, TONGIAO: e.target.value.toUpperCase() } : d
-                          )
-                        );
-                      }}
-                    ></input>
-                  </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                                           style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-
-                      value={newData.CCCD}
-                      
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index ? { ...d, CCCD: e.target.value.toUpperCase() } : d
-                          )
-                        );
-                      }}
-                    ></input>
-                  </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                                           style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-
-                      value={newData.NOITHTRU}
-                      
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index ? { ...d, NOITHTRU: e.target.value.toUpperCase() } : d
-                          )
-                        );
-                      }}
-                    ></input>
-                  </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                                           style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-
-                      value={newData.TENCHA}
-                      
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index ? { ...d, TENCHA: e.target.value.toUpperCase() } : d
-                          )
-                        );
-                      }}
-                    ></input>
-                  </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                                           style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-
-                      value={newData.TENME}
-                      
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index ? { ...d, TENME: e.target.value.toUpperCase() } : d
-                          )
-                        );
-                      }}
-                    ></input>
-                  </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                                           style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-
-                      value={newData.SOHOK}
-                      
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index ? { ...d, SOHOK: e.target.value.toUpperCase() } : d
-                          )
-                        );
-                      }}
-                    ></input>
-                  </td>
-                  <td
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "white",
-                      borderStyle: "solid",
-                    }}
-                  >
-                    <input
-                                           style={{ padding: 5, fontSize: 12, width: "100%" ,textTransform: "uppercase"  }}
-
-                      value={newData.QUANHE}
-                      
-                      onChange={(e) => {
-                        setNewData(
-                          newData.map((d, i) =>
-                            i === index ? { ...d, QUANHE: e.target.value.toUpperCase() } : d
-                          )
-                        );
-                      }}
-                    ></input>
-                  </td>
-                  <button
-                    style={{
-                      padding: 5,
-                      fontSize: 12,
-                      marginTop: 5,
-                      backgroundColor: "green",
-                      color: "white",
-                      borderRadius: 5,
-                      cursor: "pointer",
-                    }}
-                    onClick={() => addData()}
-                  >
-                    Thêm
-                  </button>
                 </tr>
-              ))}
+}
           </tbody>
         </table>
-        <div>
+
+        {/* NÚT THÊM */}
+        <div style={{ marginTop: 20 }}>
           <button
             onClick={() =>
-              setNewData([
-                {
-                  HOTEN: "",
-                  NAMSINH: "",
-                  GIOITINH: "",
-                  DANTOC: "",
-                  TONGIAO: "",
-                  CCCD: "",
-                  SOHOK: "",
-                  NOITHTRU: "",
-                  TENCHA: "",
-                  TENME: "",
-                },
-              ])
+              setNewData({
+                HOTEN: "",
+                NAMSINH: "",
+                GIOITINH: "",
+                DANTOC: "",
+                TONGIAO: "",
+                CCCD: "",
+                SOHOK: "",
+                NOITHTRU: "",
+                TENCHA: "",
+                TENME: "",
+              })
             }
+            style={{
+              backgroundColor: "#16a34a",
+              color: "white",
+              padding: "10px 20px",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+            }}
           >
-            Thêm dữ liệu
+            + Thêm dữ liệu
           </button>
         </div>
       </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
