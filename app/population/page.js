@@ -1,7 +1,4 @@
 "use client";
-import Image from "next/image";
-import styles from "../page.module.css";
-import { createClient } from "@supabase/supabase-js";
 import { useState, useEffect } from "react";
 
 export default function Home() {
@@ -16,6 +13,8 @@ export default function Home() {
 
   const [newData, setNewData] = useState(null);
   const [newFixData, setNewFixData] = useState([]);
+
+  const [loading, setLoading] = useState(false);
 
   const [fixDataIndex, setFixDataIndex] = useState(null);
 
@@ -33,42 +32,46 @@ export default function Home() {
     TENME: "TÊN MẸ",
   };
 
-async function search() {
-  try {
-    // 👉 Gom các điều kiện có giá trị
-    const filters = {};
-    if (input1.trim()) filters[select1] = input1.trim();
-    if (input2.trim()) filters[select2] = input2.trim();
-    if (input3.trim()) filters[select3] = input3.trim();
+  async function search() {
+      setLoading(true); // 👈 bật loading
+    try {
+      // 👉 Gom các điều kiện có giá trị
+      const filters = {};
+      if (input1.trim()) filters[select1] = input1.trim();
+      if (input2.trim()) filters[select2] = input2.trim();
+      if (input3.trim()) filters[select3] = input3.trim();
 
-    if (Object.keys(filters).length === 0) {
-      alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
-      return;
+      if (Object.keys(filters).length === 0) {
+        alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
+        return;
+      }
+
+      // 👉 Gửi request tới API
+      const res = await fetch("/api/searchData", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          database: "population",
+          criteria: filters,
+          fuzzy: true, // 🔍 tìm gần đúng
+        }),
+      });
+
+      if (!res.ok) throw new Error("Không thể kết nối máy chủ");
+
+      const data = await res.json();
+      console.log(data);
+
+      // 👉 Cập nhật dữ liệu kết quả
+      setFixDataIndex(null);
+      setData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Lỗi tìm kiếm:", error);
+      alert("Đã xảy ra lỗi trong quá trình tìm kiếm!");
+    }finally {
+      setLoading(false); // 👈 tắt loading
     }
-
-    // 👉 Gửi request tới API
-    const res = await fetch("/api/searchData", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        database: "population",
-        criteria: filters,
-        fuzzy: true, // 🔍 tìm gần đúng
-      }),
-    });
-
-    if (!res.ok) throw new Error("Không thể kết nối máy chủ");
-
-    const data = await res.json();
-
-    // 👉 Cập nhật dữ liệu kết quả
-    setFixDataIndex(null);
-    setData(Array.isArray(data) ? data : []);
-  } catch (error) {
-    console.error("Lỗi tìm kiếm:", error);
-    alert("Đã xảy ra lỗi trong quá trình tìm kiếm!");
   }
-}
 
   function reset() {
     setInput1("");
@@ -100,7 +103,7 @@ async function search() {
     const result = await supabase.json();
     console.log("result", result);
     console.log("newDataConvert", newDataConvert);
-    
+
     setData(data?.length ? [...data, ...[newData]] : [newData]);
     setNewData(null);
   }
@@ -236,6 +239,12 @@ async function search() {
                 value={currentInput}
                 onChange={(e) => setCurrentInput(e.target.value.toUpperCase())}
                 placeholder="NHẬP THÔNG TIN"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault(); // 👈 tránh reload form
+                    search();
+                  }
+                }}
               />
             </div>
           );
@@ -259,10 +268,11 @@ async function search() {
           </button>
           <button
             onClick={() => search()}
+            disabled={loading}
             style={{
               padding: "10px 18px",
               fontSize: 15,
-              backgroundColor: "#2563eb",
+              backgroundColor: loading ? "#707171" : "#2563eb",
               color: "white",
               borderRadius: 6,
               cursor: "pointer",
@@ -277,7 +287,12 @@ async function search() {
         <div style={{ marginTop: 25, marginBottom: 10 }}>
           Tìm thấy {data && data.length} kết quả
         </div>
-
+        {loading && (
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <div className="spinner" />
+            <div>Đang tải dữ liệu...</div>
+          </div>
+        )}
         {/* BẢNG */}
         <table
           style={{
@@ -315,6 +330,8 @@ async function search() {
                         border: "1px solid #475569",
                         textAlign: "center",
                         padding: 8,
+                        whiteSpace: "normal",
+                        wordBreak: "break-word",
                       }}
                     >
                       {i + 1}
@@ -325,6 +342,8 @@ async function search() {
                         style={{
                           border: "1px solid #475569",
                           padding: 5,
+                          whiteSpace: "normal",
+                          wordBreak: "break-word",
                         }}
                       >
                         <input
@@ -337,7 +356,7 @@ async function search() {
                             border: "none",
                             borderRadius: 4,
                           }}
-                          value={newFixData[key]}
+                          value={newFixData[key] || ""}
                           onChange={(e) => {
                             setNewFixData(
                               data.map((d, ii) =>
@@ -346,8 +365,8 @@ async function search() {
                                       ...d,
                                       [key]: e.target.value.toUpperCase(),
                                     }
-                                  : d
-                              )[i]
+                                  : d,
+                              )[i],
                             );
                           }}
                         />
@@ -358,6 +377,8 @@ async function search() {
                         border: "1px solid #475569",
                         textAlign: "center",
                         padding: 8,
+                        whiteSpace: "normal",
+                        wordBreak: "break-word",
                       }}
                     >
                       <button
@@ -372,6 +393,20 @@ async function search() {
                         }}
                       >
                         Lưu
+                      </button>
+                      <button
+                        style={{
+                          background: "gray",
+                          color: "white",
+                          padding: "5px 10px",
+                          borderRadius: 5,
+                        }}
+                        onClick={() => {
+                          setFixDataIndex(null);
+                          setNewFixData({});
+                        }}
+                      >
+                        Hủy
                       </button>
                     </td>
                   </tr>
@@ -398,6 +433,8 @@ async function search() {
                           border: "1px solid #475569",
                           textAlign: "center",
                           padding: 8,
+                          whiteSpace: "normal",
+                          wordBreak: "break-word",
                         }}
                       >
                         {key == "GIOITINH"
@@ -445,67 +482,80 @@ async function search() {
                       </button>
                     </td>
                   </tr>
-                )
+                ),
               )}
 
             {/* THÊM DỮ LIỆU */}
-            {newData &&       
-                <tr style={{ backgroundColor: "#0f172a" }}>
+            {newData && (
+              <tr style={{ backgroundColor: "#0f172a" }}>
+                <td
+                  style={{
+                    border: "1px solid #475569",
+                    textAlign: "center",
+                    padding: 8,
+                  }}
+                >
+                  {data && data.length + 1}
+                </td>
+                {Object.keys(title).map((key) => (
                   <td
+                    key={key}
                     style={{
                       border: "1px solid #475569",
-                      textAlign: "center",
-                      padding: 8,
+                      padding: 5,
                     }}
                   >
-                    {data && data.length + 1}
-                  </td>
-                  {Object.keys(title).map((key) => (
-                    <td
-                      key={key}
+                    <input
                       style={{
-                        border: "1px solid #475569",
                         padding: 5,
-                      }}
-                    >
-                      <input
-                        style={{
-                          padding: 5,
-                          fontSize: 12,
-                          width: "100%",
-                          backgroundColor: "#1e293b",
-                          color: "white",
-                          border: "none",
-                          borderRadius: 4,
-                          textTransform: "uppercase",
-                        }}
-                        value={newData[key]}
-                        onChange={(e) => {
-                          setNewData({
-                            ...newData,
-                            [key]: e.target.value.toUpperCase(),
-                          });
-                        }}
-                      />
-                    </td>
-                  ))}
-                  <td style={{ textAlign: "center", padding: 8 }}>
-                    <button
-                      style={{
-                        backgroundColor: "#10b981",
+                        fontSize: 12,
+                        width: "100%",
+                        backgroundColor: "#1e293b",
                         color: "white",
                         border: "none",
-                        borderRadius: 5,
-                        padding: "6px 12px",
-                        cursor: "pointer",
+                        borderRadius: 4,
+                        textTransform: "uppercase",
                       }}
-                      onClick={() => addData()}
-                    >
-                      Thêm
-                    </button>
+                      value={newData[key] || ""}
+                      onChange={(e) => {
+                        setNewData({
+                          ...newData,
+                          [key]: e.target.value.toUpperCase(),
+                        });
+                      }}
+                    />
                   </td>
-                </tr>
-}
+                ))}
+                <td style={{ textAlign: "center", padding: 8 }}>
+                  <button
+                    style={{
+                      backgroundColor: "#10b981",
+                      color: "white",
+                      border: "none",
+                      borderRadius: 5,
+                      padding: "6px 12px",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => addData()}
+                  >
+                    Thêm
+                  </button>
+                  <button
+                    style={{
+                      backgroundColor: "#626262",
+                      color: "white",
+                      border: "none",
+                      borderRadius: 5,
+                      padding: "6px 12px",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => setNewData(null)}
+                  >
+                    Hủy
+                  </button>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
 

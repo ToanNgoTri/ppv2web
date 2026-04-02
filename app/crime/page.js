@@ -14,10 +14,21 @@ export default function Home() {
   const [select2, setSelect2] = useState("HOTEN");
   const [select3, setSelect3] = useState("HOTEN");
 
+  const [loading, setLoading] = useState(false);
+
+  const [file, setFile] = useState(null);
+
   const [newData, setNewData] = useState(null);
   const [newFixData, setNewFixData] = useState([]);
 
   const [fixDataIndex, setFixDataIndex] = useState(null);
+
+  const [preview, setPreview] = useState(null);
+
+  const Supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  );
 
   const title = {
     HOTEN: "HỌ TÊN",
@@ -38,43 +49,45 @@ export default function Home() {
     DETENTION: "NƠI CHẤP HÀNH",
   };
 
+  async function search() {
+    setLoading(true); // 👈 bật loading
+    try {
+      // 👉 Gom các điều kiện có giá trị
+      const filters = {};
+      if (input1.trim()) filters[select1] = input1.trim();
+      if (input2.trim()) filters[select2] = input2.trim();
+      if (input3.trim()) filters[select3] = input3.trim();
 
-async function search() {
-  try {
-    // 👉 Gom các điều kiện có giá trị
-    const filters = {};
-    if (input1.trim()) filters[select1] = input1.trim();
-    if (input2.trim()) filters[select2] = input2.trim();
-    if (input3.trim()) filters[select3] = input3.trim();
+      if (Object.keys(filters).length === 0) {
+        alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
+        return;
+      }
 
-    if (Object.keys(filters).length === 0) {
-      alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
-      return;
+      // 👉 Gửi request tới API
+      const res = await fetch("/api/searchData", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          database: "crime",
+          criteria: filters,
+          fuzzy: true, // 🔍 tìm gần đúng
+        }),
+      });
+
+      if (!res.ok) throw new Error("Không thể kết nối máy chủ");
+
+      const data = await res.json();
+
+      // 👉 Cập nhật dữ liệu kết quả
+      setFixDataIndex(null);
+      setData(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Lỗi tìm kiếm:", error);
+      alert("Đã xảy ra lỗi trong quá trình tìm kiếm!");
+    } finally {
+      setLoading(false); // 👈 tắt loading
     }
-
-    // 👉 Gửi request tới API
-    const res = await fetch("/api/searchData", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        database: "crime",
-        criteria: filters,
-        fuzzy: true, // 🔍 tìm gần đúng
-      }),
-    });
-
-    if (!res.ok) throw new Error("Không thể kết nối máy chủ");
-
-    const data = await res.json();
-
-    // 👉 Cập nhật dữ liệu kết quả
-    setFixDataIndex(null);
-    setData(Array.isArray(data) ? data : []);
-  } catch (error) {
-    console.error("Lỗi tìm kiếm:", error);
-    alert("Đã xảy ra lỗi trong quá trình tìm kiếm!");
   }
-}
 
   function reset() {
     setInput1("");
@@ -86,32 +99,54 @@ async function search() {
   }
 
   async function addData() {
-    let newDataConvert = newData;
+    try {
+      let newDataConvert = { ...newData };
 
-    newDataConvert["GIOITINH"] =
-      newDataConvert["GIOITINH"] == "NAM" ? true : false;
+      newDataConvert["GIOITINH"] = newDataConvert["GIOITINH"] === "NAM";
 
-    let supabase = await fetch("/api/addData", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        database: "crime",
-        newData: newDataConvert,
-      }),
-    });
+      // upload ảnh
+      const imageUrl = await uploadImage(newData.CCCD);
 
-    alert("Thêm dữ liệu thành công");
-    const result = await supabase.json();
-    console.log("result", result);
-    console.log("newDataConvert", newDataConvert);
+      if (!imageUrl) {
+        alert("Upload ảnh thất bại");
+        return;
+      }
 
-    setData(data?.length ? [...data, ...[newData]] : [newData]);
-    setNewData(null);
+      // newDataConvert.IMAGE_URL = imageUrl;
+
+      const res = await fetch("/api/addData", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          database: "crime", // ⚠️ sửa lại cho đúng
+          newData: newDataConvert,
+        }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        console.error("API ERROR:", result);
+        alert(result?.error || "Insert thất bại");
+        return;
+      }
+
+      setData((prev) => [...prev, newDataConvert]);
+      setNewData(null);
+
+      alert("Thêm dữ liệu thành công");
+      // setPreview(null);
+      // setFile(null);
+    } catch (err) {
+      console.error(err);
+      alert("Lỗi khi thêm dữ liệu");
+    }
   }
-
   async function deleteData(cccd) {
+    await deleteImage(cccd);
+
     let supabase = await fetch("/api/deleteData", {
       method: "POST",
       headers: {
@@ -137,6 +172,16 @@ async function search() {
 
     console.log("fixItem", fixItem);
 
+    const imageUrl = await uploadImage(cccd);
+
+      console.log('file',file);
+      
+      
+    if (!imageUrl) {
+      alert("Upload ảnh thất bại",);
+      return;
+    }
+
     let supabase = await fetch("/api/fixData", {
       method: "POST",
       headers: {
@@ -154,9 +199,58 @@ async function search() {
     setData(updatedData);
     setFixDataIndex(null);
     setNewFixData([]);
-    // }
   }
 
+  function handleFileChange(e) {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      setPreview(URL.createObjectURL(selectedFile));
+    }
+  }
+
+  async function uploadImage(cccd) {
+    try {
+      const fileName = `${cccd}.jpg`;
+      console.log('fileName',fileName);
+
+      const { error } = await Supabase.storage
+        .from("imageCrime")
+        .upload(`subject/${fileName}`, file, {
+          contentType: "image/jpg",
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      const { data } = Supabase.storage
+        .from("imageCrime")
+        .getPublicUrl(`subject/${fileName}`);
+
+      return data.publicUrl;
+    } catch (err) {
+      console.error("Upload failed:", err);
+      return null;
+    }
+  }
+
+  async function deleteImage(cccd) {
+    try {
+      const fileName = `${cccd}.jpg`;
+
+      const { error } = await Supabase.storage
+        .from("imageCrime")
+        .remove([`subject/${fileName}`]); // 👈 phải là array
+
+      if (error) throw error;
+
+      console.log("Xóa ảnh thành công");
+      return true;
+    } catch (err) {
+      console.error("Delete failed:", err);
+      return false;
+    }
+  }
   return (
     <div
       style={{
@@ -247,6 +341,12 @@ async function search() {
                     setCurrentInput(e.target.value.toUpperCase())
                   }
                   placeholder="NHẬP THÔNG TIN"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault(); // 👈 tránh reload form
+                      search();
+                    }
+                  }}
                 />
               </div>
             );
@@ -280,7 +380,7 @@ async function search() {
             style={{
               padding: "10px 20px",
               fontSize: 15,
-              backgroundColor: "#3498db",
+              backgroundColor: loading ? "#707171" : "#3498db",
               color: "white",
               border: "none",
               borderRadius: 5,
@@ -288,6 +388,7 @@ async function search() {
               marginLeft: 20,
             }}
             onClick={() => search()}
+            disabled={loading}
           >
             Tìm kiếm
           </button>
@@ -297,9 +398,13 @@ async function search() {
         <div style={{ marginTop: 10, marginBottom: 20, textAlign: "center" }}>
           <b>Tìm thấy {data && data.length} kết quả</b>
         </div>
-
-        {/* --- Bảng dữ liệu --- */}
-        <table
+        {loading && (
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <div className="spinner" />
+            <div>Đang tải dữ liệu...</div>
+          </div>
+        )}
+        {/* <table
           style={{
             width: "100%",
             borderCollapse: "collapse",
@@ -307,10 +412,10 @@ async function search() {
             borderRadius: 6,
             overflow: "hidden",
             boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+            tableLayout: "fixed",
           }}
         >
           <tbody>
-            {/* Tiêu đề cột */}
             <tr style={{ backgroundColor: "#2c3e50", color: "white" }}>
               <td style={{ padding: 8, textAlign: "center" }}>STT</td>
               {Object.keys(title).map((item) => (
@@ -327,15 +432,22 @@ async function search() {
               <td style={{ padding: 8, textAlign: "center" }}>Hành động</td>
             </tr>
 
-            {/* Dữ liệu */}
             {data &&
               data.map((item, i) =>
                 fixDataIndex === i ? (
                   <tr key={i} style={{ backgroundColor: "#ecf0f1" }}>
                     <td style={{ textAlign: "center", padding: 5 }}>{i + 1}</td>
                     {Object.keys(title).map((key) => (
-                      <td key={key} style={{ padding: 5, textAlign: "center" }}>
-                        <input
+                      <td
+                        key={key}
+                        style={{
+                          padding: 5,
+                          textAlign: "center",
+                          whiteSpace: "normal",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        <textarea
                           style={{
                             padding: 5,
                             fontSize: 13,
@@ -343,7 +455,7 @@ async function search() {
                             border: "1px solid #ccc",
                             borderRadius: 4,
                           }}
-                          value={newFixData[key]}
+                          value={newFixData[key] || ""}
                           onChange={(e) =>
                             setNewFixData(
                               data.map((d, ii) =>
@@ -352,8 +464,8 @@ async function search() {
                                       ...d,
                                       [key]: e.target.value.toUpperCase(),
                                     }
-                                  : d
-                              )[i]
+                                  : d,
+                              )[i],
                             )
                           }
                         />
@@ -388,6 +500,8 @@ async function search() {
                         textAlign: "center",
                         padding: 6,
                         border: "1px solid black",
+                        whiteSpace: "normal",
+                        wordBreak: "break-word",
                       }}
                     >
                       {i + 1}
@@ -400,6 +514,8 @@ async function search() {
                           textAlign: "center",
                           color: "#333",
                           border: "1px solid black",
+                          whiteSpace: "normal",
+                          wordBreak: "break-word",
                         }}
                       >
                         {key === "GIOITINH"
@@ -409,7 +525,9 @@ async function search() {
                           : item[key]}
                       </td>
                     ))}
-                    <td style={{ textAlign: "center",border: "1px solid black", }}>
+                    <td
+                      style={{ textAlign: "center", border: "1px solid black" }}
+                    >
                       <button
                         style={{
                           fontSize: 12,
@@ -445,10 +563,9 @@ async function search() {
                       </button>
                     </td>
                   </tr>
-                )
+                ),
               )}
 
-            {/* Thêm dữ liệu mới */}
             {newData && (
               <tr style={{ backgroundColor: "#e8f5e9" }}>
                 <td style={{ padding: 5, textAlign: "center" }}>
@@ -456,7 +573,7 @@ async function search() {
                 </td>
                 {Object.keys(title).map((key) => (
                   <td key={key} style={{ padding: 5, textAlign: "center" }}>
-                    <input
+                    <textarea
                       style={{
                         padding: 5,
                         fontSize: 13,
@@ -465,7 +582,7 @@ async function search() {
                         borderRadius: 4,
                         textTransform: "uppercase",
                       }}
-                      value={newData[key]}
+                      value={newData[key] || ""}
                       onChange={(e) =>
                         setNewData({
                           ...newData,
@@ -493,7 +610,228 @@ async function search() {
               </tr>
             )}
           </tbody>
-        </table>
+        </table> */}
+
+        <div style={{ marginTop: 20 }}>
+          {data.map((item, i) => {
+            const isEditing = fixDataIndex === i;
+
+            function getImageUrl(cccd) {
+              const path = `subject/${cccd}.jpg`;
+
+              const { data } = Supabase.storage
+                .from("imageCrime")
+                .getPublicUrl(path);
+
+              return data?.publicUrl;
+            }
+
+            return (
+              <div
+                key={i}
+                style={{
+                  background: "white",
+                  borderRadius: 12,
+                  padding: 15,
+                  marginBottom: 15,
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                }}
+              >
+                {/* HEADER */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: 10,
+                  }}
+                >
+                  <b>
+                    {i + 1}. {item.HOTEN}
+                  </b>
+                  <span>{item.CCCD}</span>
+                </div>
+
+                {/* CONTENT */}
+                <div style={{ display: "flex", gap: 15 }}>
+                  {/* LEFT INFO */}
+                  <div style={{ flex: 1 }}>
+                    {Object.keys(title).map((key) => (
+                      <div key={key} style={{ marginBottom: 6 }}>
+                        <b>{title[key]}: </b>
+
+                        {isEditing ? (
+                          ["NOITHTRU", "CHARGE", "JUDGMENT"].includes(key) ? (
+                            <textarea
+                              style={inputStyle}
+                              value={newFixData[key] || ""}
+                              onChange={(e) =>
+                                setNewFixData({
+                                  ...newFixData,
+                                  [key]: e.target.value.toUpperCase(),
+                                })
+                              }
+                            />
+                          ) : (
+                            <input
+                              style={inputStyle}
+                              value={newFixData[key] || ""}
+                              onChange={(e) =>
+                                setNewFixData({
+                                  ...newFixData,
+                                  [key]: e.target.value.toUpperCase(),
+                                })
+                              }
+                            />
+                          )
+                        ) : key === "GIOITINH" ? (
+                          item[key] ? (
+                            "Nam"
+                          ) : (
+                            "Nữ"
+                          )
+                        ) : (
+                          <span style={textStyle}>{item[key]}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* IMAGE */}
+                  <div
+                    style={{
+                      width: "30%",
+                    }}
+                  >
+                    <Image
+                      src={
+                        fixDataIndex == i
+                          ? preview && preview.trim() !== null
+                            ? preview
+                            : getImageUrl(item.CCCD)
+                          : getImageUrl(item.CCCD) || "/assets/unknown.jpg"
+                      }
+                      width={400}
+                      height={400}
+                      alt="avatar"
+                      style={{
+                        borderRadius: 10,
+                        objectFit: "cover",
+                        width: "100%",
+                      }}
+                    />
+                    {isEditing && (
+                      <>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e)}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* ACTION */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 10,
+                    marginTop: 10,
+                  }}
+                >
+                  {isEditing ? (
+                    <>
+                      <button
+                        style={btnSave}
+                        onClick={() => fixData(item.CCCD)}
+                      >
+                        Lưu
+                      </button>
+
+                      <button
+                        style={btnCancel}
+                        onClick={() => {
+                          setFixDataIndex(null);
+                          setNewFixData({});
+                        }}
+                      >
+                        Hủy
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        style={btnEdit}
+                        onClick={() => {
+                          setFixDataIndex(i);
+                          setNewFixData({ ...item });
+                        }}
+                      >
+                        Sửa
+                      </button>
+
+                      <button
+                        style={btnDelete}
+                        onClick={() => deleteData(item.CCCD)}
+                      >
+                        Xóa
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* ADD NEW */}
+          {newData && (
+            <div
+              style={{
+                background: "#e8f5e9",
+                borderRadius: 12,
+                padding: 15,
+              }}
+            >
+              {Object.keys(title).map((key) => (
+                <div key={key} style={{ marginBottom: 6 }}>
+                  <b>{title[key]}: </b>
+                  <textarea
+                    style={inputStyle}
+                    value={newData[key] || ""}
+                    onChange={(e) =>
+                      setNewData({
+                        ...newData,
+                        [key]: e.target.value.toUpperCase(),
+                      })
+                    }
+                  />
+                </div>
+              ))}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileChange(e)}
+              />
+              {preview && (
+                <Image
+                  src={preview}
+                  width={120}
+                  height={120}
+                  alt="preview"
+                  style={{ borderRadius: 10 }}
+                />
+              )}
+
+              <button style={btnSave} onClick={addData}>
+                Thêm
+              </button>
+              <button style={btnCancel} onClick={() => setNewData(null)}>
+                Hủy
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* --- Nút thêm mới ở dưới --- */}
         <div style={{ marginTop: 20, textAlign: "center" }}>
@@ -533,3 +871,45 @@ async function search() {
     </div>
   );
 }
+const textStyle = {
+  display: "inline-block",
+  maxWidth: "100%",
+  whiteSpace: "normal",
+  wordBreak: "break-word",
+};
+
+const inputStyle = {
+  width: 400,
+  padding: 5,
+  marginTop: 3,
+  borderRadius: 5,
+  border: "1px solid #ccc",
+};
+
+const btnEdit = {
+  background: "#3498db",
+  color: "white",
+  padding: "5px 10px",
+  borderRadius: 5,
+};
+
+const btnDelete = {
+  background: "#e74c3c",
+  color: "white",
+  padding: "5px 10px",
+  borderRadius: 5,
+};
+
+const btnSave = {
+  background: "#27ae60",
+  color: "white",
+  padding: "5px 10px",
+  borderRadius: 5,
+};
+
+const btnCancel = {
+  background: "gray",
+  color: "white",
+  padding: "5px 10px",
+  borderRadius: 5,
+};
