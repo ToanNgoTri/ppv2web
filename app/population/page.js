@@ -30,10 +30,11 @@ export default function Home() {
     NOITHTRU: "ĐỊA CHỈ",
     TENCHA: "TÊN CHA",
     TENME: "TÊN MẸ",
+    SDT: "SĐT",
   };
 
   async function search() {
-      setLoading(true); // 👈 bật loading
+    setLoading(true); // 👈 bật loading
     try {
       // 👉 Gom các điều kiện có giá trị
       const filters = {};
@@ -68,7 +69,7 @@ export default function Home() {
     } catch (error) {
       console.error("Lỗi tìm kiếm:", error);
       alert("Đã xảy ra lỗi trong quá trình tìm kiếm!");
-    }finally {
+    } finally {
       setLoading(false); // 👈 tắt loading
     }
   }
