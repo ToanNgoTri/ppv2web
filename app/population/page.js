@@ -31,6 +31,8 @@ export default function Home() {
     TENCHA: "TÊN CHA",
     TENME: "TÊN MẸ",
     SDT: "SĐT",
+    VANGNHA: "VẮNG NHÀ",
+    GHICHU: "GHI CHÚ",
   };
 
   async function search() {
@@ -130,7 +132,7 @@ export default function Home() {
 
     let fixItem = newFixData;
 
-    fixItem["GIOITINH"] = fixItem["GIOITINH"] == "NAM" ? true : false;
+    // fixItem["GIOITINH"] = fixItem["GIOITINH"] == "NAM" ? true : false;
 
     let supabase = await fetch("/api/fixData", {
       method: "POST",
@@ -347,30 +349,52 @@ export default function Home() {
                           wordBreak: "break-word",
                         }}
                       >
-                        <input
-                          style={{
-                            padding: 5,
-                            fontSize: 12,
-                            width: "100%",
-                            backgroundColor: "#1e293b",
-                            color: "white",
-                            border: "none",
-                            borderRadius: 4,
-                          }}
-                          value={newFixData[key] || ""}
-                          onChange={(e) => {
-                            setNewFixData(
-                              data.map((d, ii) =>
-                                i === ii
-                                  ? {
-                                      ...d,
-                                      [key]: e.target.value.toUpperCase(),
-                                    }
-                                  : d,
-                              )[i],
-                            );
-                          }}
-                        />
+                        {key === "GIOITINH" ? (
+                          <select
+                            value={newFixData[key]  ? "TRUE" : "FALSE"}
+                            onChange={(e) => {
+                              setNewFixData({
+                                ...newFixData,
+                                [key]: e.target.value === "TRUE",
+                              });
+                            }}
+                          >
+                            <option value="TRUE">Nam</option>
+                            <option value="FALSE">Nữ</option>
+                          </select>
+                        ) : key === "VANGNHA" ? (
+                          <select
+                            value={newFixData[key] ? "TRUE" : "FALSE"}
+                            onChange={(e) => {
+                              setNewFixData({
+                                ...newFixData,
+                                [key]: e.target.value === "TRUE",
+                              });
+                            }}
+                          >
+                            <option value="FALSE">Không</option>
+                            <option value="TRUE">Có</option>
+                          </select>
+                        ) : (
+                          <input
+                            style={{
+                              padding: 5,
+                              fontSize: 12,
+                              width: "100%",
+                              backgroundColor: "#1e293b",
+                              color: "white",
+                              border: "none",
+                              borderRadius: 4,
+                            }}
+                            value={newFixData[key] || ""}
+                            onChange={(e) => {
+                              setNewFixData({
+                                ...newFixData,
+                                [key]: e.target.value.toUpperCase(),
+                              });
+                            }}
+                          />
+                        )}
                       </td>
                     ))}
                     <td
@@ -438,11 +462,15 @@ export default function Home() {
                           wordBreak: "break-word",
                         }}
                       >
-                        {key == "GIOITINH"
+                        {key === "GIOITINH"
                           ? item[key]
                             ? "Nam"
                             : "Nữ"
-                          : item[key]}
+                          : key === "VANGNHA"
+                            ? item[key]
+                              ? "Có"
+                              : "Không"
+                            : item[key]}
                       </td>
                     ))}
                     <td

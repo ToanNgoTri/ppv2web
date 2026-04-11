@@ -47,6 +47,8 @@ export default function Home() {
     DAYARRES: "NGÀY BẮT",
     FREEDAY: "NGÀY TỰ DO",
     DETENTION: "NƠI CHẤP HÀNH",
+    VANGNHA: "VẮNG NHÀ",
+    GHICHU: "GHI CHÚ",
   };
 
   async function search() {
@@ -168,17 +170,16 @@ export default function Home() {
 
     let fixItem = newFixData;
 
-    fixItem["GIOITINH"] = fixItem["GIOITINH"] == "NAM" ? true : false;
+    // fixItem["GIOITINH"] = fixItem["GIOITINH"] == "NAM" ? true : false;
 
     console.log("fixItem", fixItem);
 
     const imageUrl = await uploadImage(cccd);
 
-      console.log('file',file);
-      
-      
+    console.log("file", file);
+
     if (!imageUrl) {
-      alert("Upload ảnh thất bại",);
+      alert("Upload ảnh thất bại");
       return;
     }
 
@@ -212,7 +213,7 @@ export default function Home() {
   async function uploadImage(cccd) {
     try {
       const fileName = `${cccd}.jpg`;
-      console.log('fileName',fileName);
+      console.log("fileName", fileName);
 
       const { error } = await Supabase.storage
         .from("imageCrime")
@@ -404,214 +405,6 @@ export default function Home() {
             <div>Đang tải dữ liệu...</div>
           </div>
         )}
-        {/* <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            backgroundColor: "white",
-            borderRadius: 6,
-            overflow: "hidden",
-            boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-            tableLayout: "fixed",
-          }}
-        >
-          <tbody>
-            <tr style={{ backgroundColor: "#2c3e50", color: "white" }}>
-              <td style={{ padding: 8, textAlign: "center" }}>STT</td>
-              {Object.keys(title).map((item) => (
-                <td
-                  key={item}
-                  style={{
-                    padding: 8,
-                    textAlign: "center",
-                  }}
-                >
-                  {title[item]}
-                </td>
-              ))}
-              <td style={{ padding: 8, textAlign: "center" }}>Hành động</td>
-            </tr>
-
-            {data &&
-              data.map((item, i) =>
-                fixDataIndex === i ? (
-                  <tr key={i} style={{ backgroundColor: "#ecf0f1" }}>
-                    <td style={{ textAlign: "center", padding: 5 }}>{i + 1}</td>
-                    {Object.keys(title).map((key) => (
-                      <td
-                        key={key}
-                        style={{
-                          padding: 5,
-                          textAlign: "center",
-                          whiteSpace: "normal",
-                          wordBreak: "break-word",
-                        }}
-                      >
-                        <textarea
-                          style={{
-                            padding: 5,
-                            fontSize: 13,
-                            width: "90%",
-                            border: "1px solid #ccc",
-                            borderRadius: 4,
-                          }}
-                          value={newFixData[key] || ""}
-                          onChange={(e) =>
-                            setNewFixData(
-                              data.map((d, ii) =>
-                                i === ii
-                                  ? {
-                                      ...d,
-                                      [key]: e.target.value.toUpperCase(),
-                                    }
-                                  : d,
-                              )[i],
-                            )
-                          }
-                        />
-                      </td>
-                    ))}
-                    <td style={{ textAlign: "center" }}>
-                      <button
-                        style={{
-                          backgroundColor: "#27ae60",
-                          color: "white",
-                          border: "none",
-                          borderRadius: 4,
-                          padding: "5px 10px",
-                          cursor: "pointer",
-                          border: "1px solid black",
-                        }}
-                        onClick={() => fixData(data[fixDataIndex].CCCD)}
-                      >
-                        Lưu
-                      </button>
-                    </td>
-                  </tr>
-                ) : (
-                  <tr
-                    key={i}
-                    style={{
-                      backgroundColor: i % 2 === 0 ? "#fafafa" : "white",
-                    }}
-                  >
-                    <td
-                      style={{
-                        textAlign: "center",
-                        padding: 6,
-                        border: "1px solid black",
-                        whiteSpace: "normal",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {i + 1}
-                    </td>
-                    {Object.keys(title).map((key) => (
-                      <td
-                        key={key}
-                        style={{
-                          padding: 6,
-                          textAlign: "center",
-                          color: "#333",
-                          border: "1px solid black",
-                          whiteSpace: "normal",
-                          wordBreak: "break-word",
-                        }}
-                      >
-                        {key === "GIOITINH"
-                          ? item[key] === true
-                            ? "Nam"
-                            : "Nữ"
-                          : item[key]}
-                      </td>
-                    ))}
-                    <td
-                      style={{ textAlign: "center", border: "1px solid black" }}
-                    >
-                      <button
-                        style={{
-                          fontSize: 12,
-                          backgroundColor: "#3498db",
-                          color: "white",
-                          border: "none",
-                          borderRadius: 5,
-                          cursor: "pointer",
-                          padding: "5px 10px",
-                          // marginRight: 5,
-                          // border: "1px solid black",
-                        }}
-                        onClick={() => {
-                          setFixDataIndex(i);
-                          setNewFixData({ ...item });
-                        }}
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        style={{
-                          fontSize: 12,
-                          backgroundColor: "#e74c3c",
-                          color: "white",
-                          border: "none",
-                          borderRadius: 5,
-                          cursor: "pointer",
-                          padding: "5px 10px",
-                        }}
-                        onClick={() => deleteData(item.CCCD)}
-                      >
-                        Xóa
-                      </button>
-                    </td>
-                  </tr>
-                ),
-              )}
-
-            {newData && (
-              <tr style={{ backgroundColor: "#e8f5e9" }}>
-                <td style={{ padding: 5, textAlign: "center" }}>
-                  {data && data.length + 1}
-                </td>
-                {Object.keys(title).map((key) => (
-                  <td key={key} style={{ padding: 5, textAlign: "center" }}>
-                    <textarea
-                      style={{
-                        padding: 5,
-                        fontSize: 13,
-                        width: "90%",
-                        border: "1px solid #ccc",
-                        borderRadius: 4,
-                        textTransform: "uppercase",
-                      }}
-                      value={newData[key] || ""}
-                      onChange={(e) =>
-                        setNewData({
-                          ...newData,
-                          [key]: e.target.value.toUpperCase(),
-                        })
-                      }
-                    />
-                  </td>
-                ))}
-                <td style={{ textAlign: "center" }}>
-                  <button
-                    style={{
-                      backgroundColor: "#2ecc71",
-                      color: "white",
-                      border: "none",
-                      borderRadius: 5,
-                      padding: "6px 12px",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => addData()}
-                  >
-                    Thêm
-                  </button>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table> */}
-
         <div style={{ marginTop: 20 }}>
           {data.map((item, i) => {
             const isEditing = fixDataIndex === i;
@@ -660,7 +453,41 @@ export default function Home() {
                         <b>{title[key]}: </b>
 
                         {isEditing ? (
-                          ["NOITHTRU", "CHARGE", "JUDGMENT"].includes(key) ? (
+                          key === "GIOITINH" ? (
+                            <select
+                              style={inputStyle}
+                              value={
+                                newFixData[key] === true ? "TRUE" : "FALSE"
+                              }
+                              onChange={(e) =>
+                                setNewFixData({
+                                  ...newFixData,
+                                  [key]: e.target.value === "TRUE",
+                                })
+                              }
+                            >
+                              <option value="TRUE">Nam</option>
+                              <option value="FALSE">Nữ</option>
+                            </select>
+                          ) : key === "VANGNHA" ? (
+                            <select
+                              style={inputStyle}
+                              value={
+                                newFixData[key] === true ? "TRUE" : "FALSE"
+                              }
+                              onChange={(e) =>
+                                setNewFixData({
+                                  ...newFixData,
+                                  [key]: e.target.value === "TRUE",
+                                })
+                              }
+                            >
+                              <option value="TRUE">Có</option>
+                              <option value="FALSE">Không</option>
+                            </select>
+                          ) : ["NOITHTRU", "CHARGE", "JUDGMENT"].includes(
+                              key,
+                            ) ? (
                             <textarea
                               style={inputStyle}
                               value={newFixData[key] || ""}
@@ -689,7 +516,13 @@ export default function Home() {
                           ) : (
                             "Nữ"
                           )
-                        ) : (
+                        )  : key === "VANGNHA" ? (
+                          item[key] ? (
+                            "Có"
+                          ) : (
+                            "Không"
+                          )
+                        ) :(
                           <span style={textStyle}>{item[key]}</span>
                         )}
                       </div>
