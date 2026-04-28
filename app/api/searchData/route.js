@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY // chỉ dùng server
+  process.env.SUPABASE_SERVICE_ROLE_KEY, // chỉ dùng server
 );
 
 export async function POST(req) {
@@ -19,7 +19,13 @@ export async function POST(req) {
     // 🔍 Tạo truy vấn theo kiểu fuzzy (ilike) hoặc exact (match)
     if (fuzzy) {
       for (const [key, value] of Object.entries(criteria)) {
-        query = query.ilike(key, `%${value}%`);
+        if (key === "SOHOK") {
+          // 👉 exact match
+          query = query.eq(key, value);
+        } else {
+          // 👉 fuzzy match
+          query = query.ilike(key, `%${value}%`);
+        }
       }
     } else {
       query = query.match(criteria);
