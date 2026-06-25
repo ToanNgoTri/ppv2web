@@ -1,7 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
+
   const [data, setData] = useState([]);
   const [input1, setInput1] = useState("");
   const [input2, setInput2] = useState("");
@@ -36,9 +39,8 @@ export default function Home() {
   };
 
   async function search() {
-    setLoading(true); // 👈 bật loading
+    setLoading(true);
     try {
-      // 👉 Gom các điều kiện có giá trị
       const filters = {};
       if (input1.trim()) filters[select1] = input1.trim();
       if (input2.trim()) filters[select2] = input2.trim();
@@ -49,14 +51,13 @@ export default function Home() {
         return;
       }
 
-      // 👉 Gửi request tới API
       const res = await fetch("/api/searchData", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           database: "population",
           criteria: filters,
-          fuzzy: true, // 🔍 tìm gần đúng
+          fuzzy: true,
         }),
       });
 
@@ -65,14 +66,13 @@ export default function Home() {
       const data = await res.json();
       console.log(data);
 
-      // 👉 Cập nhật dữ liệu kết quả
       setFixDataIndex(null);
       setData(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Lỗi tìm kiếm:", error);
       alert("Đã xảy ra lỗi trong quá trình tìm kiếm!");
     } finally {
-      setLoading(false); // 👈 tắt loading
+      setLoading(false);
     }
   }
 
@@ -87,15 +87,12 @@ export default function Home() {
 
   async function addData() {
     let newDataConvert = newData;
-
     newDataConvert["GIOITINH"] =
       newDataConvert["GIOITINH"] == "NAM" ? true : false;
 
     let supabase = await fetch("/api/addData", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         database: "population",
         newData: newDataConvert,
@@ -114,9 +111,7 @@ export default function Home() {
   async function deleteData(cccd) {
     let supabase = await fetch("/api/deleteData", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         database: "population",
         CCCD: cccd,
@@ -128,17 +123,12 @@ export default function Home() {
 
   async function fixData(cccd) {
     if (fixDataIndex === null) return;
-    console.log("data", data);
 
     let fixItem = newFixData;
 
-    // fixItem["GIOITINH"] = fixItem["GIOITINH"] == "NAM" ? true : false;
-
     let supabase = await fetch("/api/fixData", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         database: "population",
         CCCD: cccd,
@@ -244,7 +234,7 @@ export default function Home() {
                 placeholder="NHẬP THÔNG TIN"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    e.preventDefault(); // 👈 tránh reload form
+                    e.preventDefault();
                     search();
                   }
                 }}
@@ -296,6 +286,7 @@ export default function Home() {
             <div>Đang tải dữ liệu...</div>
           </div>
         )}
+
         {/* BẢNG */}
         <table
           style={{
@@ -327,6 +318,7 @@ export default function Home() {
             {data &&
               data.map((item, i) =>
                 fixDataIndex == i ? (
+                  /* --- HÀNG ĐANG EDIT --- */
                   <tr key={i} style={{ backgroundColor: "#0f172a" }}>
                     <td
                       style={{
@@ -351,7 +343,7 @@ export default function Home() {
                       >
                         {key === "GIOITINH" ? (
                           <select
-                            value={newFixData[key]  ? "TRUE" : "FALSE"}
+                            value={newFixData[key] ? "TRUE" : "FALSE"}
                             onChange={(e) => {
                               setNewFixData({
                                 ...newFixData,
@@ -415,6 +407,7 @@ export default function Home() {
                           borderRadius: 5,
                           padding: "6px 12px",
                           cursor: "pointer",
+                          marginRight: 4,
                         }}
                       >
                         Lưu
@@ -425,6 +418,8 @@ export default function Home() {
                           color: "white",
                           padding: "5px 10px",
                           borderRadius: 5,
+                          border: "none",
+                          cursor: "pointer",
                         }}
                         onClick={() => {
                           setFixDataIndex(null);
@@ -436,6 +431,7 @@ export default function Home() {
                     </td>
                   </tr>
                 ) : (
+                  /* --- HÀNG BÌNH THƯỜNG --- */
                   <tr
                     key={i}
                     style={{
@@ -478,6 +474,7 @@ export default function Home() {
                         border: "1px solid #475569",
                         textAlign: "center",
                         padding: 8,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       <button
@@ -492,6 +489,7 @@ export default function Home() {
                           borderRadius: 5,
                           padding: "6px 10px",
                           cursor: "pointer",
+                          marginRight: 4,
                         }}
                       >
                         Sửa
@@ -505,9 +503,26 @@ export default function Home() {
                           borderRadius: 5,
                           padding: "6px 10px",
                           cursor: "pointer",
+                          marginRight: 4,
                         }}
                       >
                         Xóa
+                      </button>
+                      {/* ✅ NÚT TẠO HỒ SƠ MỚI */}
+                      <button
+                        onClick={() =>
+                          router.push(`/generatedocs?cccd=${item.CCCD}`)
+                        }
+                        style={{
+                          backgroundColor: "#10b981",
+                          color: "white",
+                          border: "none",
+                          borderRadius: 5,
+                          padding: "6px 10px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        📄 Hồ sơ
                       </button>
                     </td>
                   </tr>
@@ -564,6 +579,7 @@ export default function Home() {
                       borderRadius: 5,
                       padding: "6px 12px",
                       cursor: "pointer",
+                      marginRight: 4,
                     }}
                     onClick={() => addData()}
                   >

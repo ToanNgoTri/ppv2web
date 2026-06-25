@@ -3,8 +3,11 @@ import Image from "next/image";
 import styles from "../page.module.css";
 import { createClient } from "@supabase/supabase-js";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
+
   const [data, setData] = useState([]);
   const [input1, setInput1] = useState("");
   const [input2, setInput2] = useState("");
@@ -52,9 +55,8 @@ export default function Home() {
   };
 
   async function search() {
-    setLoading(true); // 👈 bật loading
+    setLoading(true);
     try {
-      // 👉 Gom các điều kiện có giá trị
       const filters = {};
       if (input1.trim()) filters[select1] = input1.trim();
       if (input2.trim()) filters[select2] = input2.trim();
@@ -65,14 +67,13 @@ export default function Home() {
         return;
       }
 
-      // 👉 Gửi request tới API
       const res = await fetch("/api/searchData", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           database: "crime",
           criteria: filters,
-          fuzzy: true, // 🔍 tìm gần đúng
+          fuzzy: true,
         }),
       });
 
@@ -80,14 +81,13 @@ export default function Home() {
 
       const data = await res.json();
 
-      // 👉 Cập nhật dữ liệu kết quả
       setFixDataIndex(null);
       setData(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Lỗi tìm kiếm:", error);
       alert("Đã xảy ra lỗi trong quá trình tìm kiếm!");
     } finally {
-      setLoading(false); // 👈 tắt loading
+      setLoading(false);
     }
   }
 
@@ -106,7 +106,6 @@ export default function Home() {
 
       newDataConvert["GIOITINH"] = newDataConvert["GIOITINH"] === "NAM";
 
-      // upload ảnh
       const imageUrl = await uploadImage(newData.CCCD);
 
       if (!imageUrl) {
@@ -114,15 +113,13 @@ export default function Home() {
         return;
       }
 
-      // newDataConvert.IMAGE_URL = imageUrl;
-
       const res = await fetch("/api/addData", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          database: "crime", // ⚠️ sửa lại cho đúng
+          database: "crime",
           newData: newDataConvert,
         }),
       });
@@ -139,13 +136,12 @@ export default function Home() {
       setNewData(null);
 
       alert("Thêm dữ liệu thành công");
-      // setPreview(null);
-      // setFile(null);
     } catch (err) {
       console.error(err);
       alert("Lỗi khi thêm dữ liệu");
     }
   }
+
   async function deleteData(cccd) {
     await deleteImage(cccd);
 
@@ -166,11 +162,8 @@ export default function Home() {
 
   async function fixData(cccd) {
     if (fixDataIndex === null) return;
-    console.log("data", data);
 
     let fixItem = newFixData;
-
-    // fixItem["GIOITINH"] = fixItem["GIOITINH"] == "NAM" ? true : false;
 
     console.log("fixItem", fixItem);
 
@@ -213,7 +206,6 @@ export default function Home() {
   async function uploadImage(cccd) {
     try {
       const fileName = `${cccd}.jpg`;
-      console.log("fileName", fileName);
 
       const { error } = await Supabase.storage
         .from("imageCrime")
@@ -241,7 +233,7 @@ export default function Home() {
 
       const { error } = await Supabase.storage
         .from("imageCrime")
-        .remove([`subject/${fileName}`]); // 👈 phải là array
+        .remove([`subject/${fileName}`]);
 
       if (error) throw error;
 
@@ -252,6 +244,7 @@ export default function Home() {
       return false;
     }
   }
+
   return (
     <div
       style={{
@@ -344,7 +337,7 @@ export default function Home() {
                   placeholder="NHẬP THÔNG TIN"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
-                      e.preventDefault(); // 👈 tránh reload form
+                      e.preventDefault();
                       search();
                     }
                   }}
@@ -411,11 +404,9 @@ export default function Home() {
 
             function getImageUrl(cccd) {
               const path = `subject/${cccd}.jpg`;
-
               const { data } = Supabase.storage
                 .from("imageCrime")
                 .getPublicUrl(path);
-
               return data?.publicUrl;
             }
 
@@ -511,18 +502,10 @@ export default function Home() {
                             />
                           )
                         ) : key === "GIOITINH" ? (
-                          item[key] ? (
-                            "Nam"
-                          ) : (
-                            "Nữ"
-                          )
-                        )  : key === "VANGNHA" ? (
-                          item[key] ? (
-                            "Có"
-                          ) : (
-                            "Không"
-                          )
-                        ) :(
+                          item[key] ? "Nam" : "Nữ"
+                        ) : key === "VANGNHA" ? (
+                          item[key] ? "Có" : "Không"
+                        ) : (
                           <span style={textStyle}>{item[key]}</span>
                         )}
                       </div>
@@ -530,11 +513,7 @@ export default function Home() {
                   </div>
 
                   {/* IMAGE */}
-                  <div
-                    style={{
-                      width: "30%",
-                    }}
-                  >
+                  <div style={{ width: "30%" }}>
                     <Image
                       src={
                         fixDataIndex == i
@@ -553,13 +532,11 @@ export default function Home() {
                       }}
                     />
                     {isEditing && (
-                      <>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleFileChange(e)}
-                        />
-                      </>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileChange(e)}
+                      />
                     )}
                   </div>
                 </div>
@@ -581,7 +558,6 @@ export default function Home() {
                       >
                         Lưu
                       </button>
-
                       <button
                         style={btnCancel}
                         onClick={() => {
@@ -603,12 +579,20 @@ export default function Home() {
                       >
                         Sửa
                       </button>
-
                       <button
                         style={btnDelete}
                         onClick={() => deleteData(item.CCCD)}
                       >
                         Xóa
+                      </button>
+                      {/* ✅ NÚT TẠO HỒ SƠ MỚI */}
+                      <button
+                        style={btnHoSo}
+                        onClick={() =>
+                          router.push(`/generatedocs?cccd=${item.CCCD}`)
+                        }
+                      >
+                        📄 Hồ sơ
                       </button>
                     </>
                   )}
@@ -655,7 +639,6 @@ export default function Home() {
                   style={{ borderRadius: 10 }}
                 />
               )}
-
               <button style={btnSave} onClick={addData}>
                 Thêm
               </button>
@@ -704,6 +687,7 @@ export default function Home() {
     </div>
   );
 }
+
 const textStyle = {
   display: "inline-block",
   maxWidth: "100%",
@@ -724,6 +708,8 @@ const btnEdit = {
   color: "white",
   padding: "5px 10px",
   borderRadius: 5,
+  border: "none",
+  cursor: "pointer",
 };
 
 const btnDelete = {
@@ -731,6 +717,8 @@ const btnDelete = {
   color: "white",
   padding: "5px 10px",
   borderRadius: 5,
+  border: "none",
+  cursor: "pointer",
 };
 
 const btnSave = {
@@ -738,6 +726,8 @@ const btnSave = {
   color: "white",
   padding: "5px 10px",
   borderRadius: 5,
+  border: "none",
+  cursor: "pointer",
 };
 
 const btnCancel = {
@@ -745,4 +735,15 @@ const btnCancel = {
   color: "white",
   padding: "5px 10px",
   borderRadius: 5,
+  border: "none",
+  cursor: "pointer",
+};
+
+const btnHoSo = {
+  background: "#10b981",
+  color: "white",
+  padding: "5px 10px",
+  borderRadius: 5,
+  border: "none",
+  cursor: "pointer",
 };

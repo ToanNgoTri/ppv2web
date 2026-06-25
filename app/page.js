@@ -60,6 +60,26 @@ export default function Page() {
         >
           Crime
         </a>
+
+                <a
+          href="/generatedocs"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            padding: "14px 28px",
+            background:"rgb(49 194 13)",
+            color: "#fff",
+            borderRadius: "10px",
+            textDecoration: "none",
+            fontWeight: "600",
+            transition: "0.3s",
+          }}
+          onMouseOver={(e) => (e.currentTarget.style.opacity = "0.8")}
+          onMouseOut={(e) => (e.currentTarget.style.opacity = "1")}
+        >
+          Document
+        </a>
+
       </div>
     </div>
   );
