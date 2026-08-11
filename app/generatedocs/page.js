@@ -10,6 +10,24 @@ const EMPTY_FORM = {
   noiohientai: '', noioSameAsThuongtru: false,
   ngaycap: '', thangcap: '', namcap: '', noicap: '',
   noilamviec: '',
+
+  // Nhóm THACĐ — thi hành án hình sự tại cộng đồng.
+  // Chỉ hiện khi tích ô, và chỉ có ý nghĩa với người đang chấp hành án.
+  thacd: false,
+  toidanh: '', hinhphatchinh: '', thoihan: '',
+  thoihanchaphanh: '',
+  ngaychaphanh: '', thangchaphanh: '', namchaphanh: '',
+  sobanan: '', ngaybanan: '', thangbanan: '', nambanan: '', tandbanan: '',
+  soqdtha: '', ngayqdtha: '', thangqdtha: '', namqdtha: '', tandqdtha: '',
+  noidungchaphanh: '',
+
+  // Nhóm THNCĐ — tái hòa nhập cộng đồng.
+  // Dành cho người ĐÃ chấp hành xong án phạt tù, từ vựng khác hẳn THACĐ.
+  thncd: false,
+  ngaychxapt: '', thangchxapt: '', namchxapt: '',
+  sochungnhan: '', ngaychungnhan: '', thangchungnhan: '', namchungnhan: '',
+  noicapgiay: '',
+  nghiavudansu: '',
 }
 
 const s = {
@@ -439,6 +457,98 @@ function HomeContent() {
                   </div>
                 </div>
                 <Field label="Nơi cấp" name="noicap" placeholder="Cục Cảnh sát..." value={form.noicap} onChange={handleChange} onKeyDown={onEnterSubmit} />
+              </div>
+
+              <div style={s.divider}>
+                <label style={s.checkRow}>
+                  <input
+                    type="checkbox"
+                    name="thacd"
+                    checked={form.thacd}
+                    onChange={handleChange}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <span style={{ ...s.checkLabel, fontWeight: 600 }}>
+                    THACĐ — thi hành án hình sự tại cộng đồng
+                  </span>
+                </label>
+
+                {form.thacd && (
+                  <div style={{ marginTop: 12 }}>
+                    <Field label="Tội danh" name="toidanh" value={form.toidanh} onChange={handleChange} onKeyDown={onEnterSubmit} />
+
+                    <div style={s.grid2}>
+                      <Field label="Hình phạt chính" name="hinhphatchinh" placeholder="VD: Phạt tù cho hưởng án treo" half value={form.hinhphatchinh} onChange={handleChange} onKeyDown={onEnterSubmit} />
+                      <Field label="Thời hạn" name="thoihan" placeholder="VD: 08 tháng" half value={form.thoihan} onChange={handleChange} onKeyDown={onEnterSubmit} />
+                    </div>
+
+                    <Field label="Thời hạn chấp hành" name="thoihanchaphanh" placeholder="VD: 01 năm 04 tháng" value={form.thoihanchaphanh} onChange={handleChange} onKeyDown={onEnterSubmit} />
+
+                    <div style={s.sectionLabel}>Ngày chấp hành</div>
+                    <div style={s.grid3}>
+                      <div><label style={s.label}>Ngày</label><input type="text" name="ngaychaphanh" value={form.ngaychaphanh} onChange={handleChange} placeholder="DD" style={s.fieldInput} /></div>
+                      <div><label style={s.label}>Tháng</label><input type="text" name="thangchaphanh" value={form.thangchaphanh} onChange={handleChange} placeholder="MM" style={s.fieldInput} /></div>
+                      <div><label style={s.label}>Năm</label><input type="text" name="namchaphanh" value={form.namchaphanh} onChange={handleChange} placeholder="YYYY" style={s.fieldInput} /></div>
+                    </div>
+
+                    <div style={s.sectionLabel}>Bản án</div>
+                    <Field label="Bản án số" name="sobanan" placeholder="VD: 82/2025/HS-ST" value={form.sobanan} onChange={handleChange} onKeyDown={onEnterSubmit} />
+                    <div style={s.grid3}>
+                      <div><label style={s.label}>Ngày</label><input type="text" name="ngaybanan" value={form.ngaybanan} onChange={handleChange} placeholder="DD" style={s.fieldInput} /></div>
+                      <div><label style={s.label}>Tháng</label><input type="text" name="thangbanan" value={form.thangbanan} onChange={handleChange} placeholder="MM" style={s.fieldInput} /></div>
+                      <div><label style={s.label}>Năm</label><input type="text" name="nambanan" value={form.nambanan} onChange={handleChange} placeholder="YYYY" style={s.fieldInput} /></div>
+                    </div>
+                    <Field label="TAND ra bản án" name="tandbanan" placeholder="VD: thành phố Long Khánh" value={form.tandbanan} onChange={handleChange} onKeyDown={onEnterSubmit} />
+
+                    <div style={s.sectionLabel}>Quyết định thi hành án</div>
+                    <Field label="Quyết định số" name="soqdtha" placeholder="VD: 136/2025/QĐ-CA" value={form.soqdtha} onChange={handleChange} onKeyDown={onEnterSubmit} />
+                    <div style={s.grid3}>
+                      <div><label style={s.label}>Ngày</label><input type="text" name="ngayqdtha" value={form.ngayqdtha} onChange={handleChange} placeholder="DD" style={s.fieldInput} /></div>
+                      <div><label style={s.label}>Tháng</label><input type="text" name="thangqdtha" value={form.thangqdtha} onChange={handleChange} placeholder="MM" style={s.fieldInput} /></div>
+                      <div><label style={s.label}>Năm</label><input type="text" name="namqdtha" value={form.namqdtha} onChange={handleChange} placeholder="YYYY" style={s.fieldInput} /></div>
+                    </div>
+                    <Field label="TAND ra quyết định" name="tandqdtha" placeholder="VD: khu vực 4, tỉnh Đồng Nai" value={form.tandqdtha} onChange={handleChange} onKeyDown={onEnterSubmit} />
+
+                    <Field label="Nội dung chấp hành" name="noidungchaphanh" value={form.noidungchaphanh} onChange={handleChange} onKeyDown={onEnterSubmit} />
+                  </div>
+                )}
+              </div>
+
+              <div style={s.divider}>
+                <label style={s.checkRow}>
+                  <input
+                    type="checkbox"
+                    name="thncd"
+                    checked={form.thncd}
+                    onChange={handleChange}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <span style={{ ...s.checkLabel, fontWeight: 600 }}>
+                    THNCĐ — tái hòa nhập cộng đồng
+                  </span>
+                </label>
+
+                {form.thncd && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={s.sectionLabel}>Chấp hành xong án phạt tù / được đặc xá</div>
+                    <div style={s.grid3}>
+                      <div><label style={s.label}>Ngày</label><input type="text" name="ngaychxapt" value={form.ngaychxapt} onChange={handleChange} placeholder="DD" style={s.fieldInput} /></div>
+                      <div><label style={s.label}>Tháng</label><input type="text" name="thangchxapt" value={form.thangchxapt} onChange={handleChange} placeholder="MM" style={s.fieldInput} /></div>
+                      <div><label style={s.label}>Năm</label><input type="text" name="namchxapt" value={form.namchxapt} onChange={handleChange} placeholder="YYYY" style={s.fieldInput} /></div>
+                    </div>
+
+                    <div style={s.sectionLabel}>Chứng nhận CHXAPT / đặc xá</div>
+                    <Field label="Số chứng nhận" name="sochungnhan" value={form.sochungnhan} onChange={handleChange} onKeyDown={onEnterSubmit} />
+                    <div style={s.grid3}>
+                      <div><label style={s.label}>Ngày</label><input type="text" name="ngaychungnhan" value={form.ngaychungnhan} onChange={handleChange} placeholder="DD" style={s.fieldInput} /></div>
+                      <div><label style={s.label}>Tháng</label><input type="text" name="thangchungnhan" value={form.thangchungnhan} onChange={handleChange} placeholder="MM" style={s.fieldInput} /></div>
+                      <div><label style={s.label}>Năm</label><input type="text" name="namchungnhan" value={form.namchungnhan} onChange={handleChange} placeholder="YYYY" style={s.fieldInput} /></div>
+                    </div>
+                    <Field label="Nơi cấp giấy" name="noicapgiay" value={form.noicapgiay} onChange={handleChange} onKeyDown={onEnterSubmit} />
+
+                    <Field label="Hình phạt bổ sung, bồi thường dân sự, án phí còn phải thực hiện" name="nghiavudansu" value={form.nghiavudansu} onChange={handleChange} onKeyDown={onEnterSubmit} />
+                  </div>
+                )}
               </div>
             </>
           )}

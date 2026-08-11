@@ -2,6 +2,16 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// Chuẩn hoá in hoa lúc gửi dữ liệu, không transform trong lúc gõ
+// (transform khi gõ sẽ làm hỏng bộ gõ tiếng Việt - Unikey/Telex)
+function upperFields(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj || {})) {
+    out[k] = typeof v === "string" ? v.trim().toUpperCase() : v;
+  }
+  return out;
+}
+
 export default function Home() {
   const router = useRouter();
 
@@ -42,9 +52,9 @@ export default function Home() {
     setLoading(true);
     try {
       const filters = {};
-      if (input1.trim()) filters[select1] = input1.trim();
-      if (input2.trim()) filters[select2] = input2.trim();
-      if (input3.trim()) filters[select3] = input3.trim();
+      if (input1.trim()) filters[select1] = input1.trim().toUpperCase();
+      if (input2.trim()) filters[select2] = input2.trim().toUpperCase();
+      if (input3.trim()) filters[select3] = input3.trim().toUpperCase();
 
       if (Object.keys(filters).length === 0) {
         alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
@@ -86,7 +96,7 @@ export default function Home() {
   }
 
   async function addData() {
-    let newDataConvert = newData;
+    let newDataConvert = upperFields(newData);
     newDataConvert["GIOITINH"] =
       newDataConvert["GIOITINH"] == "NAM" ? true : false;
 
@@ -104,7 +114,7 @@ export default function Home() {
     console.log("result", result);
     console.log("newDataConvert", newDataConvert);
 
-    setData(data?.length ? [...data, ...[newData]] : [newData]);
+    setData(data?.length ? [...data, newDataConvert] : [newDataConvert]);
     setNewData(null);
   }
 
@@ -124,7 +134,7 @@ export default function Home() {
   async function fixData(cccd) {
     if (fixDataIndex === null) return;
 
-    let fixItem = newFixData;
+    let fixItem = upperFields(newFixData);
 
     let supabase = await fetch("/api/fixData", {
       method: "POST",
@@ -228,9 +238,10 @@ export default function Home() {
                   backgroundColor: "#0f172a",
                   color: "white",
                   width: 250,
+                  textTransform: "uppercase",
                 }}
                 value={currentInput}
-                onChange={(e) => setCurrentInput(e.target.value.toUpperCase())}
+                onChange={(e) => setCurrentInput(e.target.value)}
                 placeholder="NHẬP THÔNG TIN"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -377,12 +388,13 @@ export default function Home() {
                               color: "white",
                               border: "none",
                               borderRadius: 4,
+                              textTransform: "uppercase",
                             }}
                             value={newFixData[key] || ""}
                             onChange={(e) => {
                               setNewFixData({
                                 ...newFixData,
-                                [key]: e.target.value.toUpperCase(),
+                                [key]: e.target.value,
                               });
                             }}
                           />
@@ -564,7 +576,7 @@ export default function Home() {
                       onChange={(e) => {
                         setNewData({
                           ...newData,
-                          [key]: e.target.value.toUpperCase(),
+                          [key]: e.target.value,
                         });
                       }}
                     />

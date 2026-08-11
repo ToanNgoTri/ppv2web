@@ -6,11 +6,42 @@ import JSZip from 'jszip'
 import fs from 'fs'
 import path from 'path'
 
+/** Token nhóm THACĐ — thi hành án hình sự tại cộng đồng (đang chấp hành án). */
+const THACD_KEYS = [
+  'TOIDANH', 'HINHPHATCHINH', 'THOIHAN', 'THOIHANCHAPHANH',
+  'NGAYCHAPHANH', 'THANGCHAPHANH', 'NAMCHAPHANH',
+  'SOBANAN', 'NGAYBANAN', 'THANGBANAN', 'NAMBANAN', 'TANDBANAN',
+  'SOQDTHA', 'NGAYQDTHA', 'THANGQDTHA', 'NAMQDTHA', 'TANDQDTHA',
+  'NOIDUNGCHAPHANH',
+]
+
+/**
+ * Token nhóm THNCĐ — tái hòa nhập cộng đồng (đã chấp hành xong án).
+ * Giới hạn ở mục 16 và 17 của Phiếu thông tin M165; các mục còn lại của phiếu
+ * giữ nguyên dấu chấm trong biểu mẫu để điền tay.
+ */
+const THNCD_KEYS = [
+  'NGAYCHXAPT', 'THANGCHXAPT', 'NAMCHXAPT',
+  'SOCHUNGNHAN', 'NGAYCHUNGNHAN', 'THANGCHUNGNHAN', 'NAMCHUNGNHAN',
+  'NOICAPGIAY', 'NGHIAVUDANSU',
+]
+
+/**
+ * Khai đủ mọi key của một nhóm token, kể cả khi nhóm đó không được bật.
+ * Thiếu key thì docxtemplater in ra chữ "undefined" giữa văn bản — lỗi rất khó
+ * phát hiện khi đã in ra giấy. Không bật nhóm thì mọi key nhận chuỗi rỗng.
+ */
+function groupFields(keys, values) {
+  return Object.fromEntries(keys.map(k => [k, (values && values[k]) || '']))
+}
+
 function processDocxTemplate(templateBuffer, dataDict) {
   const zip = new PizZip(templateBuffer)
   const doc = new Docxtemplater(zip, {
     paragraphLoop: true,
     linebreaks: true,
+    // Token nào không có dữ liệu thì để trống, tránh in ra chữ "undefined".
+    nullGetter: () => '',
   })
   doc.render(dataDict)
   return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' })
@@ -54,7 +85,25 @@ export async function POST(req) {
       namcap,
       noicap,
       sdt,
-      noilamviec
+      noilamviec,
+
+      // Nhóm THACĐ — thi hành án hình sự tại cộng đồng
+      thacd,
+      toidanh,
+      hinhphatchinh,
+      thoihan,
+      thoihanchaphanh,
+      ngaychaphanh, thangchaphanh, namchaphanh,
+      sobanan, ngaybanan, thangbanan, nambanan, tandbanan,
+      soqdtha, ngayqdtha, thangqdtha, namqdtha, tandqdtha,
+      noidungchaphanh,
+
+      // Nhóm THNCĐ — tái hòa nhập cộng đồng
+      thncd,
+      ngaychxapt, thangchxapt, namchxapt,
+      sochungnhan, ngaychungnhan, thangchungnhan, namchungnhan,
+      noicapgiay,
+      nghiavudansu,
     } = body
 
     const supabase = createClient(
@@ -130,7 +179,42 @@ export async function POST(req) {
       NAMCAP:     namcap     || '',
       NOICAP:     noicap     || '',
       SDT:        sdt        || '',
-      NOILAMVIEC:noilamviec|| ''
+      NOILAMVIEC:noilamviec|| '',
+
+      // Nhóm THACĐ. Các key luôn có mặt kể cả khi không tích ô.
+      ...groupFields(THACD_KEYS, thacd && {
+        TOIDANH: toidanh,
+        HINHPHATCHINH: hinhphatchinh,
+        THOIHAN: thoihan,
+        THOIHANCHAPHANH: thoihanchaphanh,
+        NGAYCHAPHANH: ngaychaphanh,
+        THANGCHAPHANH: thangchaphanh,
+        NAMCHAPHANH: namchaphanh,
+        SOBANAN: sobanan,
+        NGAYBANAN: ngaybanan,
+        THANGBANAN: thangbanan,
+        NAMBANAN: nambanan,
+        TANDBANAN: tandbanan,
+        SOQDTHA: soqdtha,
+        NGAYQDTHA: ngayqdtha,
+        THANGQDTHA: thangqdtha,
+        NAMQDTHA: namqdtha,
+        TANDQDTHA: tandqdtha,
+        NOIDUNGCHAPHANH: noidungchaphanh,
+      }),
+
+      // Nhóm THNCĐ.
+      ...groupFields(THNCD_KEYS, thncd && {
+        NGAYCHXAPT: ngaychxapt,
+        THANGCHXAPT: thangchxapt,
+        NAMCHXAPT: namchxapt,
+        SOCHUNGNHAN: sochungnhan,
+        NGAYCHUNGNHAN: ngaychungnhan,
+        THANGCHUNGNHAN: thangchungnhan,
+        NAMCHUNGNHAN: namchungnhan,
+        NOICAPGIAY: noicapgiay,
+        NGHIAVUDANSU: nghiavudansu,
+      }),
     }
 
     const templatesDir = path.join(process.cwd(), 'public', 'templates')

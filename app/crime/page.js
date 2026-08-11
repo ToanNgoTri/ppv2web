@@ -5,6 +5,16 @@ import { createClient } from "@supabase/supabase-js";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// Chuẩn hoá in hoa lúc gửi dữ liệu, không transform trong lúc gõ
+// (transform khi gõ sẽ làm hỏng bộ gõ tiếng Việt - Unikey/Telex)
+function upperFields(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj || {})) {
+    out[k] = typeof v === "string" ? v.trim().toUpperCase() : v;
+  }
+  return out;
+}
+
 export default function Home() {
   const router = useRouter();
 
@@ -58,9 +68,9 @@ export default function Home() {
     setLoading(true);
     try {
       const filters = {};
-      if (input1.trim()) filters[select1] = input1.trim();
-      if (input2.trim()) filters[select2] = input2.trim();
-      if (input3.trim()) filters[select3] = input3.trim();
+      if (input1.trim()) filters[select1] = input1.trim().toUpperCase();
+      if (input2.trim()) filters[select2] = input2.trim().toUpperCase();
+      if (input3.trim()) filters[select3] = input3.trim().toUpperCase();
 
       if (Object.keys(filters).length === 0) {
         alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
@@ -102,7 +112,7 @@ export default function Home() {
 
   async function addData() {
     try {
-      let newDataConvert = { ...newData };
+      let newDataConvert = upperFields(newData);
 
       newDataConvert["GIOITINH"] = newDataConvert["GIOITINH"] === "NAM";
 
@@ -163,7 +173,7 @@ export default function Home() {
   async function fixData(cccd) {
     if (fixDataIndex === null) return;
 
-    let fixItem = newFixData;
+    let fixItem = upperFields(newFixData);
 
     console.log("fixItem", fixItem);
 
@@ -331,9 +341,7 @@ export default function Home() {
                     textTransform: "uppercase",
                   }}
                   value={currentInput}
-                  onChange={(e) =>
-                    setCurrentInput(e.target.value.toUpperCase())
-                  }
+                  onChange={(e) => setCurrentInput(e.target.value)}
                   placeholder="NHẬP THÔNG TIN"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -480,23 +488,23 @@ export default function Home() {
                               key,
                             ) ? (
                             <textarea
-                              style={inputStyle}
+                              style={textInputStyle}
                               value={newFixData[key] || ""}
                               onChange={(e) =>
                                 setNewFixData({
                                   ...newFixData,
-                                  [key]: e.target.value.toUpperCase(),
+                                  [key]: e.target.value,
                                 })
                               }
                             />
                           ) : (
                             <input
-                              style={inputStyle}
+                              style={textInputStyle}
                               value={newFixData[key] || ""}
                               onChange={(e) =>
                                 setNewFixData({
                                   ...newFixData,
-                                  [key]: e.target.value.toUpperCase(),
+                                  [key]: e.target.value,
                                 })
                               }
                             />
@@ -614,12 +622,12 @@ export default function Home() {
                 <div key={key} style={{ marginBottom: 6 }}>
                   <b>{title[key]}: </b>
                   <textarea
-                    style={inputStyle}
+                    style={textInputStyle}
                     value={newData[key] || ""}
                     onChange={(e) =>
                       setNewData({
                         ...newData,
-                        [key]: e.target.value.toUpperCase(),
+                        [key]: e.target.value,
                       })
                     }
                   />
@@ -702,6 +710,9 @@ const inputStyle = {
   borderRadius: 5,
   border: "1px solid #ccc",
 };
+
+// Ô nhập chữ: chỉ hiển thị in hoa bằng CSS, giá trị thật giữ nguyên như gõ
+const textInputStyle = { ...inputStyle, textTransform: "uppercase" };
 
 const btnEdit = {
   background: "#3498db",
