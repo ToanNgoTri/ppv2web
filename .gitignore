@@ -20,6 +20,9 @@
 # production
 /build
 
+# gói đóng sẵn (scripts/dong-goi.mjs) — nặng và có thể chứa khoá Supabase
+/dist-offline
+
 # misc
 .DS_Store
 *.pem
@@ -32,6 +35,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# Trừ hai file mẫu — chỉ có URL và tên biến, không chứa khóa nào.
+!.env.*.example
 
 # vercel
 .vercel

@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireUser } from '../../../lib/auth'
 
 export async function GET(req) {
+  // Chặn truy cập chưa đăng nhập. Route dùng khóa service-role nên bỏ qua
+  // Row Level Security — đây là chỗ duy nhất kiểm soát quyền.
+  const { response: chuaDangNhap } = await requireUser()
+  if (chuaDangNhap) return chuaDangNhap
+
+
   const { searchParams } = new URL(req.url)
   const cccd = searchParams.get('cccd')
 

@@ -1,4 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import { checkTable } from '../../../lib/tables'
+import { requireUser } from '../../../lib/auth'
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
@@ -6,15 +8,20 @@ const supabaseAdmin = createClient(
 );
 
 export async function POST(req) {
+  // Chặn truy cập chưa đăng nhập. Route dùng khóa service-role nên bỏ qua
+  // Row Level Security — đây là chỗ duy nhất kiểm soát quyền.
+  const { response: chuaDangNhap } = await requireUser()
+  if (chuaDangNhap) return chuaDangNhap
+
+
   try {
     const body = await req.json();
     const { database, criteria = {}, fuzzy = false } = body;
 
-    if (!database) {
-      return Response.json({ error: "Thiếu tên database" }, { status: 400 });
-    }
+    const { table, response: bangLa } = checkTable(database)
+    if (bangLa) return bangLa
 
-    let query = supabaseAdmin.from(database).select("*");
+    let query = supabaseAdmin.from(table).select("*");
 
     // 🔍 Tạo truy vấn theo kiểu fuzzy (ilike) hoặc exact (match)
     if (fuzzy) {

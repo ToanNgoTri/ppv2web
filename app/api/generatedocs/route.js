@@ -5,6 +5,7 @@ import Docxtemplater from 'docxtemplater'
 import JSZip from 'jszip'
 import fs from 'fs'
 import path from 'path'
+import { requireUser } from '../../../lib/auth'
 
 /** Token nhóm THACĐ — thi hành án hình sự tại cộng đồng (đang chấp hành án). */
 const THACD_KEYS = [
@@ -69,6 +70,12 @@ function getAllTemplateFiles(dir, baseDir = dir) {
 }
 
 export async function POST(req) {
+  // Chặn truy cập chưa đăng nhập. Route dùng khóa service-role nên bỏ qua
+  // Row Level Security — đây là chỗ duy nhất kiểm soát quyền.
+  const { response: chuaDangNhap } = await requireUser()
+  if (chuaDangNhap) return chuaDangNhap
+
+
   try {
     const body = await req.json()
     const {

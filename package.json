@@ -6,9 +6,13 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dong-goi": "node scripts/dong-goi.mjs",
+    "dong-goi:mac": "node scripts/dong-goi.mjs --mac",
+    "dong-goi:win": "node scripts/dong-goi.mjs --windows"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.58.0",
     "docxtemplater": "^3.69.0",
     "jszip": "^3.10.1",
