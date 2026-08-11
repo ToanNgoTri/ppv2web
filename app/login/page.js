@@ -77,7 +77,13 @@ const s = {
     fontSize: 14,
     fontWeight: 600,
     borderRadius: 8,
-    border: '1px solid #e5e7eb',
+    // Viết tách borderWidth/Style/Color chứ không dùng shorthand `border`:
+    // tabActive chỉ đổi borderColor, mà trộn shorthand với non-shorthand cho
+    // cùng một thuộc tính thì React cảnh báo và màu viền có thể không cập nhật
+    // đúng lúc đổi tab.
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#e5e7eb',
     background: '#fff',
     color: '#6b7280',
     cursor: 'pointer',
