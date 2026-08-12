@@ -23,13 +23,14 @@ process.chdir(GOC)
 
 const LA_WINDOWS = process.platform === 'win32'
 
-/** Biến bắt buộc: thiếu bất kỳ cái nào là app chạy lên nhưng mọi thao tác đều lỗi. */
-const BIEN_BAT_BUOC = [
-  'SUPABASE_URL',
-  'SUPABASE_SERVICE_ROLE_KEY',
-  'NEXT_PUBLIC_SUPABASE_URL',
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-]
+/**
+ * Biến bắt buộc: thiếu bất kỳ cái nào là app chạy lên nhưng mọi thao tác đều lỗi.
+ *
+ * Chỉ hai biến này được đọc LÚC CHẠY. NEXT_PUBLIC_* đã bị nướng cứng vào bundle
+ * lúc build (cả client lẫn server, kể cả middleware.js) nên điền lại ở máy đích
+ * không có tác dụng — xem phần so sánh dự án bên dưới.
+ */
+const BIEN_BAT_BUOC = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']
 
 /** Giữ cửa sổ lại để người dùng đọc được lỗi, thay vì nó biến mất ngay. */
 async function dungLai(ma = 1) {
@@ -66,8 +67,35 @@ if (thieu.length) {
   console.error(`\n  Mở file .env.local (cùng thư mục này) bằng Notepad / TextEdit và thêm:\n`)
   for (const k of thieu) console.error(`    ${k}=...`)
   console.error(`\n  Lấy giá trị ở Supabase → Project Settings → API.`)
-  console.error(`  SUPABASE_URL và NEXT_PUBLIC_SUPABASE_URL là cùng một URL.`)
   await dungLai()
+}
+
+/**
+ * Chặn lắp lẫn .env.local của dự án khác.
+ *
+ * Nếu không kiểm, hỏng theo kiểu rất khó lần ra: đăng nhập vẫn được (phía trình
+ * duyệt và middleware dùng URL/ANON đã nướng trong bundle), nhưng các API route
+ * lại đọc SUPABASE_URL lúc chạy nên đọc/ghi sang dự án khác — tra cứu ra rỗng
+ * hoặc ghi dữ liệu vào sai nơi.
+ */
+const F_TT = join(GOC, 'thong-tin-goi.json')
+if (existsSync(F_TT)) {
+  try {
+    const { duAnBuild } = JSON.parse(readFileSync(F_TT, 'utf8'))
+    if (duAnBuild && process.env.SUPABASE_URL !== duAnBuild) {
+      console.error('✗ .env.local không khớp với gói này.\n')
+      console.error(`    Gói được build cho : ${duAnBuild}`)
+      console.error(`    .env.local đang trỏ: ${process.env.SUPABASE_URL}\n`)
+      console.error('  Khoá ANON và URL phía trình duyệt đã nướng cứng trong bundle lúc build,')
+      console.error('  không sửa được từ .env.local. Chạy tiếp sẽ ra tình trạng đăng nhập được')
+      console.error('  nhưng dữ liệu đọc/ghi sai dự án.\n')
+      console.error('  Cách sửa: sửa SUPABASE_URL trong .env.local về đúng URL trên,')
+      console.error('  hoặc đóng gói lại từ project với .env.local của dự án bạn muốn.')
+      await dungLai()
+    }
+  } catch {
+    console.log('ℹ Không đọc được thong-tin-goi.json, bỏ qua bước so khớp dự án.')
+  }
 }
 
 /** Lấy hostname để kiểm mạng; URL sai định dạng cũng chặn luôn tại đây. */

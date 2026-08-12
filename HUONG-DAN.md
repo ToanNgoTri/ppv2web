@@ -7,6 +7,25 @@ sang máy khác là chạy được, không cần cài Node, không cần `npm i
 
 ## 1. Đóng gói (làm ở máy có project)
 
+### Máy vừa `git pull` về thì chưa đóng gói được
+
+`.env.local` bị `.gitignore` nên **không** đi theo code. Thiếu nó thì `next build`
+chết ở bước *Collecting page data* với `Error: supabaseUrl is required` — vì các
+API route gọi `createClient(process.env.SUPABASE_URL, …)` ở cấp module, Next phải
+nạp module đó lúc build.
+
+Hai file mẫu **có** trong git. Trên máy mới làm 3 việc:
+
+```bash
+npm install
+cp .env.hanggon.example .env.local      # hoặc .env.population.example
+# điền SUPABASE_SERVICE_ROLE_KEY và NEXT_PUBLIC_SUPABASE_ANON_KEY
+npm run dong-goi:mac
+```
+
+Script kiểm `.env.local` ở **bước 0/5**, trước khi build, và dừng kèm đúng hai
+dòng `cp` trên nếu thiếu — không để bạn phải đọc lỗi webpack.
+
 ```bash
 npm run dong-goi:mac        # gói cho macOS
 npm run dong-goi:win        # gói cho Windows 64-bit
@@ -27,7 +46,7 @@ node scripts/dong-goi.mjs --windows --ra D:\USB
 |---|---|
 | `--windows` / `--mac` | chọn hệ đích. Không ghi gì thì lấy hệ đang chạy |
 | `--khong-node` | không nhúng Node (~80–110 MB). Máy đích phải tự có Node >= 20 |
-| `--khong-env` | **không** nhúng `.env.local`. Gói sẽ kèm `.env.local.mau` để máy đích tự điền |
+| `--khong-env` | **không** nhúng `.env.local`. Gói kèm `.env.local.mau` để máy đích điền khoá service-role. Không bỏ được yêu cầu phải có `.env.local` ở **máy đóng gói** |
 | `--ra <thư mục>` | đổi nơi ghi gói |
 | `--help` | in bảng hướng dẫn |
 
@@ -102,19 +121,67 @@ Gói cũng chạy được bằng `npm start` nếu máy có Node.
 | Vào trang nào cũng bị đẩy về `/login` | Chưa đăng nhập, hoặc phiên hết hạn |
 | API trả `{"error":"Chưa đăng nhập"}` | Đăng nhập lại ở `/login` |
 
-### 4 biến trong `.env.local`
+### Các file `.env*` — file nào có tác dụng
 
-Lấy ở Supabase → Project Settings → API:
+**Next chỉ đọc `.env.local`.** Đã kiểm bằng chính bộ nạp của Next
+(`@next/env`): cắm một biến đánh dấu vào `.env.population.local` rồi nạp lại thì
+biến đó ra `undefined`, và Next báo `Environments: .env.local`.
 
+| File | Trong git | Next đọc | Việc của nó |
+|---|---|---|---|
+| `.env.local` | không | **có** | File duy nhất đang có tác dụng. Hiện trỏ dự án **hanggon** |
+| `.env.hanggon.example` | **có** | không | Mẫu: URL hanggon + chú thích, khoá để trống. Máy mới `cp` từ đây |
+| `.env.population.example` | **có** | không | Mẫu: URL population, khoá để trống |
+| `.env.population.local` | không | không | **Kho chứa khoá** dự án population. Không tự chạy, nhưng dùng để đổi dự án bằng một lệnh |
+
+Hai file `.example` **cần giữ** — chúng là thứ duy nhất đi theo `git pull`, và
+bước 0/5 của script đóng gói chỉ thẳng vào chúng.
+
+`.env.population.local` **không tự có tác dụng gì**, nhưng đừng xoá: nó chứa đủ
+cả 4 giá trị thật của dự án population (đã kiểm: service-role và anon key đều
+hợp lệ, `/auth/v1/health` trả 200), nên đổi dự án chỉ còn một lệnh:
+
+```bash
+cp .env.local .env.hanggon.local          # lưu lại hanggon trước, chưa có file này
+cp .env.population.local .env.local       # chuyển sang population
+npm run dong-goi:mac                      # đóng gói cho population
 ```
-SUPABASE_URL=https://xxxxxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=...
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+
+> ⚠ **Đừng đặt tên file thành `.env.production.local`.** Tên đó chỉ khác
+> `.env.population.local` vài chữ nhưng **Next CÓ đọc nó** và nó ghi đè
+> `.env.local` ở bản production — sẽ ra kiểu hỏng rất khó lần.
+
+### ⚠ Gói bị khoá vào một dự án Supabase
+
+`NEXT_PUBLIC_*` bị **nướng cứng vào bundle lúc build** — không chỉ phía trình
+duyệt mà cả phía server, kể cả `middleware.js`. Đã kiểm: sau khi build, chuỗi URL
+literal nằm trong 3 chunk client và 10 file server, và không còn dòng
+`process.env.NEXT_PUBLIC_SUPABASE_URL` nào trong bundle client.
+
+Hệ quả: **sửa `.env.local` trong gói đã đóng KHÔNG đổi được dự án.** Chỉ hai biến
+sau là đọc lúc chạy:
+
+| Biến | Đọc lúc nào |
+|---|---|
+| `SUPABASE_URL` | **lúc chạy** — máy đích đổi được |
+| `SUPABASE_SERVICE_ROLE_KEY` | **lúc chạy** — máy đích đổi được |
+| `REQUIRE_ACTIVE_PROFILE` | **lúc chạy** — máy đích đổi được |
+| `NEXT_PUBLIC_SUPABASE_URL` | lúc build — nướng cứng, sửa vô ích |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | lúc build — nướng cứng, sửa vô ích |
+
+Đây là bẫy thật với hai dự án `hanggon` / `population`: lắp `.env.local` của dự án
+khác vào gói thì **đăng nhập vẫn được** (trình duyệt + middleware dùng dự án đã
+nướng) nhưng **API đọc/ghi sang dự án kia** — tra cứu ra rỗng, hoặc thêm dữ liệu
+vào sai nơi. Không có thông báo lỗi nào.
+
+Nên script ghi `thong-tin-goi.json` vào gói:
+
+```json
+{ "duAnBuild": "https://cppilyhbusukcmrwpvfc.supabase.co", "hdh": "mac", ... }
 ```
 
-`SUPABASE_URL` và `NEXT_PUBLIC_SUPABASE_URL` là **cùng một URL**. Launcher kiểm
-đủ 4 biến trước khi bật server, thiếu là dừng luôn kèm hướng dẫn.
+và launcher **so `SUPABASE_URL` với `duAnBuild`, lệch là dừng ngay** kèm cả hai URL.
+Muốn đổi dự án thì đóng gói lại từ project với `.env.local` của dự án đó.
 
 ---
 

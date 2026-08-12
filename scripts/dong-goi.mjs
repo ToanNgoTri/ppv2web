@@ -125,6 +125,67 @@ async function coFile(p) {
   }
 }
 
+// ── 0. chặn sớm: máy đóng gói PHẢI có .env.local ────────────────────────────
+/**
+ * Máy vừa `git clone` / `git pull` thì KHÔNG có .env.local (bị .gitignore).
+ * Build khi thiếu env sẽ chết ở bước "Collecting page data" với thông báo
+ * `Error: supabaseUrl is required` trỏ vào .next/server/chunks/… — nhìn không ra
+ * nguyên nhân thật. Chặn ngay ở đây kèm hướng dẫn cụ thể.
+ *
+ * Lý do build BẮT BUỘC cần env, không thể để máy đích tự điền sau:
+ * các API route gọi createClient(process.env.SUPABASE_URL, …) ở cấp module, nên
+ * Next phải nạp module lúc build để thu thập thông tin route.
+ */
+const BIEN_CAN_CO = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+]
+
+const F_ENV = join(GOC, '.env.local')
+if (!(await coFile(F_ENV))) {
+  console.error('✗ Không có .env.local — KHÔNG build được, nên cũng không đóng gói được.\n')
+  console.error('  Máy vừa pull code thì chưa có file này (.gitignore bỏ qua nó).')
+  console.error('  Hai file mẫu ĐÃ nằm trong git, chọn một rồi điền 2 khoá:\n')
+  console.error('      cp .env.hanggon.example .env.local        # dự án HANGGON')
+  console.error('      cp .env.population.example .env.local    # dự án POPULATION\n')
+  console.error('  Rồi điền SUPABASE_SERVICE_ROLE_KEY và NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  console.error('  (Supabase → Project Settings → API), sau đó chạy lại lệnh đóng gói.')
+  process.exit(1)
+}
+
+/** Đọc .env.local đủ dùng để kiểm; app dùng bộ đọc của Next. */
+const envGoc = {}
+for (const dong of (await readFile(F_ENV, 'utf8')).split(/\r?\n/)) {
+  const m = dong.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
+  if (m) envGoc[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
+}
+
+const thieuEnv = BIEN_CAN_CO.filter((k) => !envGoc[k])
+if (thieuEnv.length) {
+  console.error('✗ .env.local có nhưng thiếu giá trị — build sẽ chết ở "Collecting page data".\n')
+  for (const k of thieuEnv) console.error(`      ${k}=`)
+  console.error('\n  Điền nốt rồi chạy lại. Lấy khoá ở Supabase → Project Settings → API.')
+  process.exit(1)
+}
+
+/**
+ * NEXT_PUBLIC_* bị NƯỚNG CỨNG vào bundle lúc build (cả phía client lẫn server,
+ * kể cả middleware.js). Nên gói bị khoá vào đúng dự án Supabase đang dùng LÚC
+ * NÀY — đổi .env.local trong gói đã đóng KHÔNG đổi được dự án cho phía trình
+ * duyệt. Ghi lại URL này vào gói để launcher phát hiện khi bị lắp lẫn.
+ */
+const DU_AN_BUILD = envGoc.NEXT_PUBLIC_SUPABASE_URL
+console.log(`▶ 0/5  Kiểm .env.local — OK`)
+console.log(`  Dự án Supabase sẽ được NƯỚNG vào gói: ${DU_AN_BUILD}`)
+if (envGoc.SUPABASE_URL !== DU_AN_BUILD) {
+  console.log(`  ⚠ SUPABASE_URL (${envGoc.SUPABASE_URL}) KHÁC NEXT_PUBLIC_SUPABASE_URL.`)
+  console.log('    Hai biến này phải là cùng một URL, nếu không phía server và phía')
+  console.log('    trình duyệt sẽ nói chuyện với hai dự án khác nhau.')
+}
+console.log()
+
 // ── 1. build ────────────────────────────────────────────────────────────────
 // Gọi "next build" trực tiếp, KHÔNG qua "npm run build": script build của project
 // có cờ --turbopack, mà bộ dò phụ thuộc cho output:"standalone" của Turbopack còn
@@ -175,22 +236,45 @@ if (mangEnv) {
     console.log('  ⚠ Không thấy .env.local — máy đích sẽ phải tự tạo file này.')
   }
 } else {
-  // Để lại file mẫu, không có giá trị thật, cho người ở máy đích tự điền.
+  /**
+   * Chỉ để lại đúng hai biến MÀ MÁY ĐÍCH THỰC SỰ ĐỔI ĐƯỢC.
+   * NEXT_PUBLIC_URL và ANON_KEY đã nướng vào bundle lúc build nên điền lại ở đây
+   * không có tác dụng gì — ghi vào file mẫu chỉ làm người dùng tưởng đổi được
+   * dự án bằng cách sửa file này.
+   */
   await writeFile(
     join(RA, '.env.local.mau'),
     [
       '# Đổi tên file này thành .env.local rồi điền giá trị thật.',
       '# Lấy ở Supabase -> Project Settings -> API',
-      'SUPABASE_URL=',
+      '#',
+      `# Gói này đã được build cho dự án: ${DU_AN_BUILD}`,
+      '# URL đó và khoá ANON đã nằm sẵn trong bundle, KHÔNG sửa được từ đây.',
+      '# Chỉ hai biến dưới là đọc lúc chạy:',
+      '',
+      `SUPABASE_URL=${DU_AN_BUILD}`,
       'SUPABASE_SERVICE_ROLE_KEY=',
-      'NEXT_PUBLIC_SUPABASE_URL=',
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY=',
+      '',
+      '# Bắt buộc tài khoản phải được duyệt (profiles.is_active = true) mới dùng được.',
+      'REQUIRE_ACTIVE_PROFILE=true',
       '',
     ].join('\n'),
     'utf8',
   )
-  console.log('  ✓ .env.local.mau (không nhúng khoá — máy đích tự điền)')
+  console.log('  ✓ .env.local.mau (không nhúng khoá service-role — máy đích tự điền)')
 }
+
+/**
+ * Ghi lại dự án đã nướng vào gói để khoi-dong.mjs so sánh với .env.local lúc
+ * chạy. Không có file này thì lắp lẫn .env.local của dự án khác sẽ ra lỗi rất
+ * khó hiểu: đăng nhập được (phía trình duyệt dùng dự án nướng sẵn) nhưng mọi API
+ * lại đọc/ghi sang dự án khác.
+ */
+await writeFile(
+  join(RA, 'thong-tin-goi.json'),
+  JSON.stringify({ duAnBuild: DU_AN_BUILD, hdh, nhungNode, mangEnv }, null, 2) + '\n',
+  'utf8',
+)
 
 // ── 3. kiểm gói có đủ file chạy chưa ────────────────────────────────────────
 console.log('▶ 3/5  Kiểm gói đủ file')
