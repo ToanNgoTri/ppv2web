@@ -241,8 +241,30 @@ chạm trần thì giao diện cảnh báo vàng chứ không im lặng cắt b�
 Tên cột phải bọc nháy kép vì viết hoa: `"HOTEN"` chạy được, `HOTEN` thì Postgres
 hạ thành `hoten` và báo không có cột. Chuỗi dùng nháy đơn.
 
-Không phải nhớ cú pháp `in (...)`: bấm **Dán danh sách CCCD →**, dán mỗi dòng một
-số, bấm *Sinh câu lệnh tìm* là ra sẵn câu lệnh (tự bỏ trùng, tự thêm nháy).
+### Dán danh sách CCCD
+
+Bấm **Dán danh sách CCCD →**, dán mỗi dòng một số (hoặc copy thẳng một cột từ
+Excel), rồi chọn một trong hai nút. Tự bỏ trùng, tự thêm nháy, tự báo đã dán bao
+nhiêu số:
+
+| Nút | Trả về |
+|---|---|
+| **Tìm người CÓ trong database** | hồ sơ của những số tra được |
+| **Tìm số KHÔNG có trong database** | những số trong danh sách mà database chưa có |
+
+Nút thứ hai sinh câu lệnh dạng `unnest(array[…]) … where not exists`, **không**
+phải `not in`. Đây là chỗ rất dễ viết ngược:
+
+```sql
+-- ĐÚNG: danh sách dán vào là vế trái, ra những số CHƯA CÓ
+select x from unnest(array['079…','079…']) as x
+where not exists (select 1 from population p where trim(p."CCCD") = trim(x));
+
+-- SAI: ra 24.292 dòng — là những người TRONG database không nằm trong danh sách
+select * from population where "CCCD" not in ('079…','079…');
+```
+
+So sánh có `trim()` hai bên vì dữ liệu nhập tay hay dính khoảng trắng thừa.
 
 ---
 

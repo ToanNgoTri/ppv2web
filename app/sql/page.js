@@ -12,6 +12,16 @@ from population
 where "CCCD" in ('079201001234', '079201005678')`,
   },
   {
+    ten: "CCCD KHÔNG có trong DB",
+    sql: `select x as "CCCD_KHONG_CO"
+from unnest(array[
+  '079201001234', '079201005678', '079201009999'
+]) as x
+where not exists (
+  select 1 from population p where trim(p."CCCD") = trim(x)
+)`,
+  },
+  {
     ten: "Đếm theo tổ",
     sql: `select "NOITHTRU", count(*) as so_nguoi
 from population
@@ -113,23 +123,60 @@ export default function TruyVanSql() {
     }
   }
 
-  /** Dán một danh sách CCCD (mỗi dòng một số) → sinh sẵn câu lệnh tìm. */
-  function sinhCauLenhTuDanhSach() {
+  /**
+   * Tách ô dán thành danh sách số CCCD.
+   *
+   * Nhận mọi kiểu dán: mỗi dòng một số, cách nhau dấu phẩy, chấm phẩy, hay copy
+   * nguyên một cột từ Excel. Bỏ nháy đơn để không làm hỏng câu lệnh sinh ra.
+   */
+  const soDaDan = useMemo(() => {
     const ma = danhSach
       .split(/[\s,;]+/)
-      .map((x) => x.trim().replace(/'/g, ""))
+      .map((x) => x.trim().replace(/['"]/g, ""))
       .filter(Boolean);
+    return { tatCa: ma, khacNhau: [...new Set(ma)] };
+  }, [danhSach]);
 
+  /**
+   * Sinh câu lệnh từ danh sách đã dán.
+   *
+   * kieu = "co"    → những người CÓ trong database (tra cứu hàng loạt)
+   * kieu = "khong" → những số KHÔNG có trong database
+   *
+   * Bản "khong" dùng `unnest(array[...])` chứ không phải `not in (...)`: danh
+   * sách dán vào phải là VẾ TRÁI thì mới hiện ra được số nào thiếu. Viết
+   * `where "CCCD" not in (...)` là ra ngược hẳn — nó liệt kê 24 nghìn người
+   * trong database không nằm trong danh sách.
+   */
+  function sinhCauLenh(kieu) {
+    const ma = soDaDan.khacNhau;
     if (!ma.length) {
       alert("Chưa dán danh sách CCCD nào.");
       return;
     }
-    const trongNgoac = [...new Set(ma)].map((x) => `'${x}'`).join(", ");
-    setSql(
-      `select "HOTEN", "NAMSINH", "GIOITINH", "CCCD", "SOHOK", "NOITHTRU"\n` +
-        `from population\n` +
-        `where "CCCD" in (${trongNgoac})`,
-    );
+
+    if (kieu === "khong") {
+      // Xuống dòng mỗi 4 số cho câu lệnh còn đọc được khi danh sách dài.
+      const mang = ma
+        .map((x, i) => `'${x}'${i === ma.length - 1 ? "" : ","}${i % 4 === 3 ? "\n  " : " "}`)
+        .join("")
+        .trim();
+      setSql(
+        `select x as "CCCD_KHONG_CO"\n` +
+          `from unnest(array[\n  ${mang}\n]) as x\n` +
+          `where not exists (\n` +
+          `  select 1 from population p where trim(p."CCCD") = trim(x)\n` +
+          `)`,
+      );
+    } else {
+      const trongNgoac = ma.map((x) => `'${x}'`).join(", ");
+      setSql(
+        `select "HOTEN", "NAMSINH", "GIOITINH", "CCCD", "SOHOK", "NOITHTRU"\n` +
+          `from population\n` +
+          `where "CCCD" in (${trongNgoac})`,
+      );
+    }
+
     setHienTroGiup(false);
     oSoanThao.current?.focus();
   }
@@ -226,8 +273,9 @@ export default function TruyVanSql() {
             }}
           >
             <div style={{ fontSize: 13, color: "#a5f3fc", marginBottom: 8 }}>
-              Dán danh sách số CCCD (mỗi dòng một số, hoặc cách nhau bằng dấu phẩy).
-              Bấm nút bên dưới để tự sinh câu lệnh tìm — không phải tự gõ dấu nháy.
+              Dán danh sách số CCCD — mỗi dòng một số, hoặc cách nhau bằng dấu phẩy, hoặc
+              copy thẳng một cột từ Excel. Chọn một trong hai nút bên dưới, câu lệnh sẽ
+              được sinh sẵn.
             </div>
             <textarea
               value={danhSach}
@@ -246,21 +294,55 @@ export default function TruyVanSql() {
                 resize: "vertical",
               }}
             />
-            <button
-              onClick={sinhCauLenhTuDanhSach}
+            <div
               style={{
                 marginTop: 8,
-                padding: "8px 16px",
-                fontSize: 14,
-                backgroundColor: "#0891b2",
-                color: "white",
-                border: "none",
-                borderRadius: 6,
-                cursor: "pointer",
+                display: "flex",
+                gap: 10,
+                alignItems: "center",
+                flexWrap: "wrap",
               }}
             >
-              Sinh câu lệnh tìm
-            </button>
+              <button
+                onClick={() => sinhCauLenh("co")}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: 14,
+                  backgroundColor: "#0891b2",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                Tìm người CÓ trong database
+              </button>
+              <button
+                onClick={() => sinhCauLenh("khong")}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  backgroundColor: "#b45309",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                Tìm số KHÔNG có trong database
+              </button>
+
+              {soDaDan.tatCa.length > 0 && (
+                <span style={{ fontSize: 13, color: "#a5f3fc" }}>
+                  đã dán {soDaDan.tatCa.length} số
+                  {soDaDan.khacNhau.length !== soDaDan.tatCa.length &&
+                    ` · ${soDaDan.khacNhau.length} số khác nhau (đã bỏ ${
+                      soDaDan.tatCa.length - soDaDan.khacNhau.length
+                    } số trùng)`}
+                </span>
+              )}
+            </div>
           </div>
         )}
 
