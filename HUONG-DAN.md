@@ -205,7 +205,48 @@ ra 208 file thay vì ~101. Muốn dọn thì chuyển hai thư mục đó ra ngo
 
 ---
 
-## 4. Cấu trúc gói
+## 4. Màn hình Truy vấn SQL (`/sql`)
+
+Dán câu lệnh SQL vào, bấm Chạy, kết quả đổ ra bảng — dùng để tra cứu hàng loạt
+(nhiều CCCD một lúc), thống kê, đối chiếu hai bảng. Có nút tải CSV.
+
+### ⚠ Phải cài hàm trong Supabase, MỖI DỰ ÁN MỘT LẦN
+
+`supabase-js` không chạy được SQL thô, nên câu lệnh được gửi qua RPC tới một hàm
+Postgres. Hàm đó **không** đi theo gói — nó nằm trong database.
+
+Vào Supabase → SQL Editor → dán toàn bộ `sql/truy-van-sql.sql` → Run.
+Làm ở **cả hai** dự án `population` và `hanggon`, vì đó là hai database riêng.
+
+Chưa chạy thì màn hình báo thẳng: *"Chưa cài hàm truy vấn trong Supabase…"*.
+
+Bước `revoke` ở cuối file đó **bắt buộc**: khóa anon nằm công khai trong bundle
+trình duyệt, không thu hồi quyền thì ai lấy được khóa đó cũng gọi thẳng RPC và
+đọc sạch mọi bảng mà không cần đăng nhập.
+
+### Chỉ đọc, chặn ở 4 lớp
+
+| Lớp | Ở đâu | Chặn cái gì |
+|---|---|---|
+| `lib/sql.js` | Node | Bỏ chú thích và chuỗi rồi soi: phải bắt đầu bằng SELECT/WITH, một câu lệnh, không từ khóa ghi. Chỉ để **báo lỗi tiếng Việt sớm**, không phải hàng rào |
+| `requireUser()` | `/api/runSql` | Chưa đăng nhập / chưa duyệt là 401, 403 |
+| `set local transaction_read_only = on` | Postgres | Transaction read-only, mọi lệnh ghi bị động cơ từ chối — kể cả khi câu SELECT gọi tới một hàm có ghi |
+| bọc `select * from ( … ) sub` | Postgres | DELETE/UPDATE/INSERT thành **lỗi cú pháp**. CTE ghi cũng hỏng vì Postgres bắt CTE ghi phải ở cấp cao nhất |
+
+Câu lệnh chạy quá **15 giây** bị cắt. Trả tối đa **5000 dòng** (mặc định 1000);
+chạm trần thì giao diện cảnh báo vàng chứ không im lặng cắt bớt.
+
+### Lưu ý khi gõ
+
+Tên cột phải bọc nháy kép vì viết hoa: `"HOTEN"` chạy được, `HOTEN` thì Postgres
+hạ thành `hoten` và báo không có cột. Chuỗi dùng nháy đơn.
+
+Không phải nhớ cú pháp `in (...)`: bấm **Dán danh sách CCCD →**, dán mỗi dòng một
+số, bấm *Sinh câu lệnh tìm* là ra sẵn câu lệnh (tự bỏ trùng, tự thêm nháy).
+
+---
+
+## 5. Cấu trúc gói
 
 ```
 ppv2web-mac/
@@ -218,7 +259,7 @@ ppv2web-mac/
 ├── .env.local              cấu hình Supabase (nếu không dùng --khong-env)
 ├── runtime/node            Node nhúng kèm (không có nếu dùng --khong-node)
 ├── .next/                  bản build
-├── node_modules/           dependency Next cần (xem mục 5: các dep của API
+├── node_modules/           dependency Next cần (xem mục 6: các dep của API
 │                           đã nằm trong bundle, không có ở đây)
 └── public/templates/       template .docx, sửa được sau khi đóng gói
 ```
@@ -228,7 +269,7 @@ Gói **không** chạy được `npm run dev` / `npm run build` — thiếu `app
 
 ---
 
-## 5. Vài chi tiết kỹ thuật đáng biết
+## 6. Vài chi tiết kỹ thuật đáng biết
 
 **Build bằng webpack, không Turbopack.** `scripts/dong-goi.mjs` gọi thẳng
 `npx next build` chứ không qua `npm run build` (script này có cờ `--turbopack`).

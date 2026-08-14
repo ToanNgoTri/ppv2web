@@ -80,6 +80,25 @@ export default function Page() {
           Document
         </a>
 
+        <a
+          href="/sql"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            padding: "14px 28px",
+            background: "#0891b2",
+            color: "#fff",
+            borderRadius: "10px",
+            textDecoration: "none",
+            fontWeight: "600",
+            transition: "0.3s",
+          }}
+          onMouseOver={(e) => (e.currentTarget.style.opacity = "0.8")}
+          onMouseOut={(e) => (e.currentTarget.style.opacity = "1")}
+        >
+          Truy vấn SQL
+        </a>
+
       </div>
     </div>
   );
