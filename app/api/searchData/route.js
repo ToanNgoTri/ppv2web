@@ -1,5 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
-import { checkTable } from '../../../lib/tables'
+import {
+  checkTable,
+  laCotBoolean,
+  doiSangBoolean,
+  GIOI_HAN_KET_QUA,
+} from '../../../lib/tables'
 import { requireUser } from '../../../lib/auth'
 
 const supabaseAdmin = createClient(
@@ -16,7 +21,7 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
-    const { database, criteria = {}, fuzzy = false } = body;
+    const { database, criteria = {}, flags = {}, fuzzy = false } = body;
 
     const { table, response: bangLa } = checkTable(database)
     if (bangLa) return bangLa
@@ -26,7 +31,10 @@ export async function POST(req) {
     // 🔍 Tạo truy vấn theo kiểu fuzzy (ilike) hoặc exact (match)
     if (fuzzy) {
       for (const [key, value] of Object.entries(criteria)) {
-        if (key === "SOHOK") {
+        if (laCotBoolean(table, key)) {
+          // 👉 cột boolean: ilike sẽ làm hỏng câu truy vấn, phải so bằng
+          query = query.eq(key, doiSangBoolean(value));
+        } else if (key === "SOHOK") {
           // 👉 exact match
           query = query.eq(key, value);
         } else {
@@ -38,8 +46,24 @@ export async function POST(req) {
       query = query.match(criteria);
     }
 
-    // 👉 Có thể thêm limit để tránh trả về quá nhiều kết quả
-    query = query.limit(100);
+    // 🏷️ Các ô phân loại bật/tắt (ANNINH, MATUY, TUTHA, THACD, TIENSU...).
+    // Chỉ ô nào được bật mới thêm điều kiện — không bật ô nào thì không lọc,
+    // tức là tìm tất cả.
+    for (const [key, on] of Object.entries(flags)) {
+      if (!on) continue;
+      if (!laCotBoolean(table, key)) {
+        return Response.json(
+          { error: `Cột phân loại không hợp lệ: ${String(key)}` },
+          { status: 400 },
+        );
+      }
+      query = query.eq(key, true);
+    }
+
+    // 👉 Giới hạn số dòng trả về. Để 1000 (trần một lần gọi của PostgREST) vì
+    // lọc theo ô phân loại có thể khớp hàng trăm dòng, mức 100 cũ sẽ cắt cụt
+    // kết quả mà người dùng không hề biết.
+    query = query.limit(GIOI_HAN_KET_QUA);
 
     const { data, error } = await query;
 

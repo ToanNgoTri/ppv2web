@@ -2,15 +2,48 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// Cột giữ nguyên chữ như người dùng gõ. Toạ độ in hoa lên thì vô nghĩa, mà
+// còn làm link bản đồ trông kỳ.
+const KHONG_IN_HOA = ["LOCATION"];
+
+// Cột chỉ để xem/sửa, không đưa vào ô "Chọn Dữ liệu" vì tìm theo nó vô nghĩa.
+const KHONG_TIM = ["LOCATION"];
+
+// Toạ độ lưu dạng "10.863423, 107.224308". Dựng sẵn link Google Maps để bấm
+// vào là mở đúng vị trí, khỏi phải copy dán tay.
+function mapUrl(toaDo) {
+  return `https://www.google.com/maps?q=${encodeURIComponent(
+    String(toaDo).trim(),
+  )}`;
+}
+
 // Chuẩn hoá in hoa lúc gửi dữ liệu, không transform trong lúc gõ
 // (transform khi gõ sẽ làm hỏng bộ gõ tiếng Việt - Unikey/Telex)
 function upperFields(obj) {
   const out = {};
   for (const [k, v] of Object.entries(obj || {})) {
-    out[k] = typeof v === "string" ? v.trim().toUpperCase() : v;
+    out[k] =
+      typeof v === "string" && !KHONG_IN_HOA.includes(k)
+        ? v.trim().toUpperCase()
+        : v;
   }
   return out;
 }
+
+// Cột boolean của bảng population: nhãn hiển thị cho hai trạng thái.
+// Gom vào một chỗ để cả lúc hiển thị lẫn lúc sửa dùng chung, không phải lồng
+// thêm một tầng ternary mỗi khi thêm cột mới.
+const BOOLEAN_LABELS = {
+  GIOITINH: { true: "Nam", false: "Nữ" },
+  VANGNHA: { true: "Có", false: "Không" },
+  CRIMINALRECORD: { true: "Có", false: "Không" },
+};
+
+// Các cột được lọc bằng ô bấm ở trên vùng tìm kiếm thay vì ô nhập chữ.
+// Không bấm ô nào = không lọc = tìm tất cả.
+const FLAG_LABELS = {
+  CRIMINALRECORD: "Tiền án/tiền sự",
+};
 
 export default function Home() {
   const router = useRouter();
@@ -31,6 +64,11 @@ export default function Home() {
 
   const [fixDataIndex, setFixDataIndex] = useState(null);
 
+  // Trạng thái bật/tắt của các ô phân loại phía trên vùng tìm kiếm
+  const [flags, setFlags] = useState(() =>
+    Object.fromEntries(Object.keys(FLAG_LABELS).map((k) => [k, false])),
+  );
+
   const title = {
     HOTEN: "HỌ TÊN",
     GIOITINH: "GIỚI TÍNH",
@@ -41,12 +79,21 @@ export default function Home() {
     DANTOC: "DÂN TỘC",
     TONGIAO: "TÔN GIÁO",
     NOITHTRU: "ĐỊA CHỈ",
+    NOIOHIENTAI: "NƠI Ở HIỆN TẠI",
     TENCHA: "TÊN CHA",
     TENME: "TÊN MẸ",
     SDT: "SĐT",
     VANGNHA: "VẮNG NHÀ",
+    CRIMINALRECORD: "TIỀN ÁN/TIỀN SỰ",
     GHICHU: "GHI CHÚ",
+    LOCATION: "TOẠ ĐỘ",
   };
+
+  // Danh sách cột cho ô "Chọn Dữ liệu": bỏ các cột đã có ô bấm riêng và các
+  // cột không tìm theo được.
+  const searchFields = Object.keys(title).filter(
+    (k) => !(k in FLAG_LABELS) && !KHONG_TIM.includes(k),
+  );
 
   async function search() {
     setLoading(true);
@@ -56,7 +103,8 @@ export default function Home() {
       if (input2.trim()) filters[select2] = input2.trim().toUpperCase();
       if (input3.trim()) filters[select3] = input3.trim().toUpperCase();
 
-      if (Object.keys(filters).length === 0) {
+      const flagsBat = Object.values(flags).some(Boolean);
+      if (Object.keys(filters).length === 0 && !flagsBat) {
         alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
         return;
       }
@@ -67,6 +115,7 @@ export default function Home() {
         body: JSON.stringify({
           database: "population",
           criteria: filters,
+          flags,
           fuzzy: true,
         }),
       });
@@ -93,12 +142,22 @@ export default function Home() {
     setSelect1("HOTEN");
     setSelect2("HOTEN");
     setSelect3("HOTEN");
+    setFlags(
+      Object.fromEntries(Object.keys(FLAG_LABELS).map((k) => [k, false])),
+    );
   }
 
   async function addData() {
     let newDataConvert = upperFields(newData);
-    newDataConvert["GIOITINH"] =
-      newDataConvert["GIOITINH"] == "NAM" ? true : false;
+    // Cột boolean phải gửi đúng kiểu true/false, gửi chuỗi thì Postgres từ chối
+    for (const key of Object.keys(BOOLEAN_LABELS)) {
+      if (key in newDataConvert) {
+        newDataConvert[key] =
+          newDataConvert[key] === true ||
+          String(newDataConvert[key]).toUpperCase() ===
+            BOOLEAN_LABELS[key].true.toUpperCase();
+      }
+    }
 
     let supabase = await fetch("/api/addData", {
       method: "POST",
@@ -188,6 +247,43 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Ô PHÂN LOẠI — bấm để lọc, không bấm ô nào thì tìm tất cả */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+            marginBottom: 20,
+            justifyContent: "center",
+          }}
+        >
+          {Object.keys(FLAG_LABELS).map((field) => {
+            const on = flags[field];
+            return (
+              <button
+                key={field}
+                type="button"
+                onClick={() =>
+                  setFlags((prev) => ({ ...prev, [field]: !prev[field] }))
+                }
+                style={{
+                  padding: "6px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  borderRadius: 16,
+                  cursor: "pointer",
+                  border: `1px solid ${on ? "#22c55e" : "#475569"}`,
+                  backgroundColor: on ? "#22c55e" : "#1e293b",
+                  color: on ? "white" : "#cbd5e1",
+                }}
+              >
+                {on ? "✓ " : ""}
+                {FLAG_LABELS[field]}
+              </button>
+            );
+          })}
+        </div>
+
         {/* FORM TÌM KIẾM */}
         {[1, 2, 3].map((num) => {
           const currentTitle =
@@ -223,7 +319,7 @@ export default function Home() {
                   if (num === 3) setSelect3(e.target.value);
                 }}
               >
-                {Object.keys(title).map((item) => (
+                {searchFields.map((item) => (
                   <option key={item} value={item}>
                     {title[item]}
                   </option>
@@ -290,6 +386,11 @@ export default function Home() {
         {/* KẾT QUẢ */}
         <div style={{ marginTop: 25, marginBottom: 10 }}>
           Tìm thấy {data && data.length} kết quả
+          {data && data.length >= 1000 && (
+            <span style={{ color: "#fbbf24", marginLeft: 8 }}>
+              (đã cắt ở 1000 dòng — thu hẹp điều kiện để xem hết)
+            </span>
+          )}
         </div>
         {loading && (
           <div style={{ textAlign: "center", marginTop: 20 }}>
@@ -299,9 +400,11 @@ export default function Home() {
         )}
 
         {/* BẢNG */}
+        <div style={{ width: "100%", overflowX: "auto" }}>
         <table
           style={{
             width: "100%",
+            minWidth: 1400,
             borderCollapse: "collapse",
             backgroundColor: "#1e293b",
             borderRadius: 10,
@@ -352,7 +455,7 @@ export default function Home() {
                           wordBreak: "break-word",
                         }}
                       >
-                        {key === "GIOITINH" ? (
+                        {BOOLEAN_LABELS[key] ? (
                           <select
                             value={newFixData[key] ? "TRUE" : "FALSE"}
                             onChange={(e) => {
@@ -362,21 +465,12 @@ export default function Home() {
                               });
                             }}
                           >
-                            <option value="TRUE">Nam</option>
-                            <option value="FALSE">Nữ</option>
-                          </select>
-                        ) : key === "VANGNHA" ? (
-                          <select
-                            value={newFixData[key] ? "TRUE" : "FALSE"}
-                            onChange={(e) => {
-                              setNewFixData({
-                                ...newFixData,
-                                [key]: e.target.value === "TRUE",
-                              });
-                            }}
-                          >
-                            <option value="FALSE">Không</option>
-                            <option value="TRUE">Có</option>
+                            <option value="TRUE">
+                              {BOOLEAN_LABELS[key].true}
+                            </option>
+                            <option value="FALSE">
+                              {BOOLEAN_LABELS[key].false}
+                            </option>
                           </select>
                         ) : (
                           <input
@@ -388,7 +482,9 @@ export default function Home() {
                               color: "white",
                               border: "none",
                               borderRadius: 4,
-                              textTransform: "uppercase",
+                              textTransform: KHONG_IN_HOA.includes(key)
+                                ? "none"
+                                : "uppercase",
                             }}
                             value={newFixData[key] || ""}
                             onChange={(e) => {
@@ -470,15 +566,20 @@ export default function Home() {
                           wordBreak: "break-word",
                         }}
                       >
-                        {key === "GIOITINH"
-                          ? item[key]
-                            ? "Nam"
-                            : "Nữ"
-                          : key === "VANGNHA"
-                            ? item[key]
-                              ? "Có"
-                              : "Không"
-                            : item[key]}
+                        {BOOLEAN_LABELS[key] ? (
+                          BOOLEAN_LABELS[key][item[key] ? "true" : "false"]
+                        ) : key === "LOCATION" && item[key] ? (
+                          <a
+                            href={mapUrl(item[key])}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "#93c5fd" }}
+                          >
+                            📍 {item[key]}
+                          </a>
+                        ) : (
+                          item[key]
+                        )}
                       </td>
                     ))}
                     <td
@@ -561,25 +662,46 @@ export default function Home() {
                       padding: 5,
                     }}
                   >
-                    <input
-                      style={{
-                        padding: 5,
-                        fontSize: 12,
-                        width: "100%",
-                        backgroundColor: "#1e293b",
-                        color: "white",
-                        border: "none",
-                        borderRadius: 4,
-                        textTransform: "uppercase",
-                      }}
-                      value={newData[key] || ""}
-                      onChange={(e) => {
-                        setNewData({
-                          ...newData,
-                          [key]: e.target.value,
-                        });
-                      }}
-                    />
+                    {BOOLEAN_LABELS[key] ? (
+                      <select
+                        value={newData[key] ? "TRUE" : "FALSE"}
+                        onChange={(e) => {
+                          setNewData({
+                            ...newData,
+                            [key]: e.target.value === "TRUE",
+                          });
+                        }}
+                      >
+                        <option value="FALSE">
+                          {BOOLEAN_LABELS[key].false}
+                        </option>
+                        <option value="TRUE">
+                          {BOOLEAN_LABELS[key].true}
+                        </option>
+                      </select>
+                    ) : (
+                      <input
+                        style={{
+                          padding: 5,
+                          fontSize: 12,
+                          width: "100%",
+                          backgroundColor: "#1e293b",
+                          color: "white",
+                          border: "none",
+                          borderRadius: 4,
+                          textTransform: KHONG_IN_HOA.includes(key)
+                            ? "none"
+                            : "uppercase",
+                        }}
+                        value={newData[key] || ""}
+                        onChange={(e) => {
+                          setNewData({
+                            ...newData,
+                            [key]: e.target.value,
+                          });
+                        }}
+                      />
+                    )}
                   </td>
                 ))}
                 <td style={{ textAlign: "center", padding: 8 }}>
@@ -615,6 +737,7 @@ export default function Home() {
             )}
           </tbody>
         </table>
+        </div>
 
         {/* NÚT THÊM */}
         <div style={{ marginTop: 20 }}>
@@ -629,8 +752,14 @@ export default function Home() {
                 CCCD: "",
                 SOHOK: "",
                 NOITHTRU: "",
+                NOIOHIENTAI: "",
                 TENCHA: "",
                 TENME: "",
+                SDT: "",
+                VANGNHA: false,
+                CRIMINALRECORD: false,
+                GHICHU: "",
+                LOCATION: "",
               })
             }
             style={{

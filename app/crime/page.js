@@ -5,15 +5,55 @@ import { createClient } from "@supabase/supabase-js";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// Cột giữ nguyên chữ thường/hoa: URL in hoa lên là bấm vào không ra gì nữa,
+// toạ độ cũng không có lý do gì phải đổi.
+const KHONG_IN_HOA = ["LINKFOLDER", "LOCATION"];
+
+// Toạ độ lưu dạng "10.863423, 107.224308". Dựng sẵn link Google Maps để bấm
+// vào là mở đúng vị trí, khỏi phải copy dán tay.
+function mapUrl(toaDo) {
+  return `https://www.google.com/maps?q=${encodeURIComponent(
+    String(toaDo).trim(),
+  )}`;
+}
+
 // Chuẩn hoá in hoa lúc gửi dữ liệu, không transform trong lúc gõ
 // (transform khi gõ sẽ làm hỏng bộ gõ tiếng Việt - Unikey/Telex)
 function upperFields(obj) {
   const out = {};
   for (const [k, v] of Object.entries(obj || {})) {
-    out[k] = typeof v === "string" ? v.trim().toUpperCase() : v;
+    out[k] =
+      typeof v === "string" && !KHONG_IN_HOA.includes(k)
+        ? v.trim().toUpperCase()
+        : v;
   }
   return out;
 }
+
+// Cột boolean của bảng crime: nhãn hiển thị cho hai trạng thái.
+// Gom một chỗ để phần hiển thị, phần sửa và phần thêm mới dùng chung.
+const BOOLEAN_LABELS = {
+  GIOITINH: { true: "Nam", false: "Nữ" },
+  VANGNHA: { true: "Có", false: "Không" },
+  ANNINH: { true: "Có", false: "Không" },
+  MATUY: { true: "Có", false: "Không" },
+  TUTHA: { true: "Có", false: "Không" },
+  THACD: { true: "Có", false: "Không" },
+  TIENSU: { true: "Có", false: "Không" },
+};
+
+// Phân loại đối tượng — lọc bằng ô bấm ở trên vùng tìm kiếm, không phải ô gõ
+// chữ. Không bấm ô nào = không lọc = tìm tất cả.
+const FLAG_LABELS = {
+  ANNINH: "An ninh",
+  MATUY: "Ma túy",
+  TUTHA: "Tù tha",
+  THACD: "THA CĐ",
+  TIENSU: "Tiền sự",
+};
+
+// Cột chỉ để xem/sửa, không đưa vào ô "Chọn Dữ liệu" vì tìm theo nó vô nghĩa.
+const KHONG_TIM = ["LINKFOLDER", "LOCATION"];
 
 export default function Home() {
   const router = useRouter();
@@ -38,6 +78,11 @@ export default function Home() {
 
   const [preview, setPreview] = useState(null);
 
+  // Trạng thái bật/tắt của các ô phân loại phía trên vùng tìm kiếm
+  const [flags, setFlags] = useState(() =>
+    Object.fromEntries(Object.keys(FLAG_LABELS).map((k) => [k, false])),
+  );
+
   const Supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -60,9 +105,22 @@ export default function Home() {
     DAYARRES: "NGÀY BẮT",
     FREEDAY: "NGÀY TỰ DO",
     DETENTION: "NƠI CHẤP HÀNH",
+    TENVO: "TÊN VỢ/CHỒNG",
     VANGNHA: "VẮNG NHÀ",
+    ANNINH: "AN NINH",
+    MATUY: "MA TÚY",
+    TUTHA: "TÙ THA",
+    THACD: "THA CĐ",
+    TIENSU: "TIỀN SỰ",
     GHICHU: "GHI CHÚ",
+    LINKFOLDER: "LINK HỒ SƠ",
+    LOCATION: "TOẠ ĐỘ",
   };
+
+  // Danh sách cột cho ô "Chọn Dữ liệu": bỏ các cột đã có ô bấm riêng.
+  const searchFields = Object.keys(title).filter(
+    (k) => !(k in FLAG_LABELS) && !KHONG_TIM.includes(k),
+  );
 
   async function search() {
     setLoading(true);
@@ -72,7 +130,8 @@ export default function Home() {
       if (input2.trim()) filters[select2] = input2.trim().toUpperCase();
       if (input3.trim()) filters[select3] = input3.trim().toUpperCase();
 
-      if (Object.keys(filters).length === 0) {
+      const flagsBat = Object.values(flags).some(Boolean);
+      if (Object.keys(filters).length === 0 && !flagsBat) {
         alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
         return;
       }
@@ -83,6 +142,7 @@ export default function Home() {
         body: JSON.stringify({
           database: "crime",
           criteria: filters,
+          flags,
           fuzzy: true,
         }),
       });
@@ -108,13 +168,25 @@ export default function Home() {
     setSelect1("HOTEN");
     setSelect2("HOTEN");
     setSelect3("HOTEN");
+    setFlags(
+      Object.fromEntries(Object.keys(FLAG_LABELS).map((k) => [k, false])),
+    );
   }
 
   async function addData() {
     try {
       let newDataConvert = upperFields(newData);
 
-      newDataConvert["GIOITINH"] = newDataConvert["GIOITINH"] === "NAM";
+      // Cot boolean phai gui dung kieu true/false; o them moi da la o chon nen
+      // gia tri co the da la boolean san, chi ep kieu cho chac.
+      for (const key of Object.keys(BOOLEAN_LABELS)) {
+        if (key in newDataConvert) {
+          newDataConvert[key] =
+            newDataConvert[key] === true ||
+            String(newDataConvert[key]).toUpperCase() ===
+              BOOLEAN_LABELS[key].true.toUpperCase();
+        }
+      }
 
       const imageUrl = await uploadImage(newData.CCCD);
 
@@ -287,6 +359,43 @@ export default function Home() {
             CÔNG CỤ TÌM KIẾM ĐỐI TƯỢNG
           </div>
 
+          {/* Ô PHÂN LOẠI — bấm để lọc, không bấm ô nào thì tìm tất cả */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 10,
+              marginBottom: 20,
+              justifyContent: "center",
+            }}
+          >
+            {Object.keys(FLAG_LABELS).map((field) => {
+              const on = flags[field];
+              return (
+                <button
+                  key={field}
+                  type="button"
+                  onClick={() =>
+                    setFlags((prev) => ({ ...prev, [field]: !prev[field] }))
+                  }
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    borderRadius: 16,
+                    cursor: "pointer",
+                    border: on ? "1px solid #198754" : "1px solid #ccc",
+                    backgroundColor: on ? "#198754" : "#fafafa",
+                    color: on ? "white" : "#495057",
+                  }}
+                >
+                  {on ? "✓ " : ""}
+                  {FLAG_LABELS[field]}
+                </button>
+              );
+            })}
+          </div>
+
           {[1, 2, 3].map((num) => {
             const currentTitle =
               num === 1 ? select1 : num === 2 ? select2 : select3;
@@ -323,7 +432,7 @@ export default function Home() {
                     if (num === 3) setSelect3(e.target.value);
                   }}
                 >
-                  {Object.keys(title).map((item) => (
+                  {searchFields.map((item) => (
                     <option key={item} value={item}>
                       {title[item]}
                     </option>
@@ -399,6 +508,11 @@ export default function Home() {
         {/* --- Kết quả --- */}
         <div style={{ marginTop: 10, marginBottom: 20, textAlign: "center" }}>
           <b>Tìm thấy {data && data.length} kết quả</b>
+          {data && data.length >= 1000 && (
+            <span style={{ color: "#b45309", marginLeft: 8 }}>
+              (đã cắt ở 1000 dòng — thu hẹp điều kiện để xem hết)
+            </span>
+          )}
         </div>
         {loading && (
           <div style={{ textAlign: "center", marginTop: 20 }}>
@@ -452,7 +566,7 @@ export default function Home() {
                         <b>{title[key]}: </b>
 
                         {isEditing ? (
-                          key === "GIOITINH" ? (
+                          BOOLEAN_LABELS[key] ? (
                             <select
                               style={inputStyle}
                               value={
@@ -465,24 +579,12 @@ export default function Home() {
                                 })
                               }
                             >
-                              <option value="TRUE">Nam</option>
-                              <option value="FALSE">Nữ</option>
-                            </select>
-                          ) : key === "VANGNHA" ? (
-                            <select
-                              style={inputStyle}
-                              value={
-                                newFixData[key] === true ? "TRUE" : "FALSE"
-                              }
-                              onChange={(e) =>
-                                setNewFixData({
-                                  ...newFixData,
-                                  [key]: e.target.value === "TRUE",
-                                })
-                              }
-                            >
-                              <option value="TRUE">Có</option>
-                              <option value="FALSE">Không</option>
+                              <option value="TRUE">
+                                {BOOLEAN_LABELS[key].true}
+                              </option>
+                              <option value="FALSE">
+                                {BOOLEAN_LABELS[key].false}
+                              </option>
                             </select>
                           ) : ["NOITHTRU", "CHARGE", "JUDGMENT"].includes(
                               key,
@@ -499,7 +601,11 @@ export default function Home() {
                             />
                           ) : (
                             <input
-                              style={textInputStyle}
+                              style={
+                                KHONG_IN_HOA.includes(key)
+                                  ? inputStyle
+                                  : textInputStyle
+                              }
                               value={newFixData[key] || ""}
                               onChange={(e) =>
                                 setNewFixData({
@@ -509,10 +615,26 @@ export default function Home() {
                               }
                             />
                           )
-                        ) : key === "GIOITINH" ? (
-                          item[key] ? "Nam" : "Nữ"
-                        ) : key === "VANGNHA" ? (
-                          item[key] ? "Có" : "Không"
+                        ) : BOOLEAN_LABELS[key] ? (
+                          BOOLEAN_LABELS[key][item[key] ? "true" : "false"]
+                        ) : key === "LOCATION" && item[key] ? (
+                          <a
+                            href={mapUrl(item[key])}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ ...textStyle, color: "#2563eb" }}
+                          >
+                            📍 {item[key]}
+                          </a>
+                        ) : key === "LINKFOLDER" && item[key] ? (
+                          <a
+                            href={item[key]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ ...textStyle, color: "#2563eb" }}
+                          >
+                            {item[key]}
+                          </a>
                         ) : (
                           <span style={textStyle}>{item[key]}</span>
                         )}
@@ -621,16 +743,34 @@ export default function Home() {
               {Object.keys(title).map((key) => (
                 <div key={key} style={{ marginBottom: 6 }}>
                   <b>{title[key]}: </b>
-                  <textarea
-                    style={textInputStyle}
-                    value={newData[key] || ""}
-                    onChange={(e) =>
-                      setNewData({
-                        ...newData,
-                        [key]: e.target.value,
-                      })
-                    }
-                  />
+                  {BOOLEAN_LABELS[key] ? (
+                    <select
+                      style={inputStyle}
+                      value={newData[key] === true ? "TRUE" : "FALSE"}
+                      onChange={(e) =>
+                        setNewData({
+                          ...newData,
+                          [key]: e.target.value === "TRUE",
+                        })
+                      }
+                    >
+                      <option value="FALSE">{BOOLEAN_LABELS[key].false}</option>
+                      <option value="TRUE">{BOOLEAN_LABELS[key].true}</option>
+                    </select>
+                  ) : (
+                    <textarea
+                      style={
+                        KHONG_IN_HOA.includes(key) ? inputStyle : textInputStyle
+                      }
+                      value={newData[key] || ""}
+                      onChange={(e) =>
+                        setNewData({
+                          ...newData,
+                          [key]: e.target.value,
+                        })
+                      }
+                    />
+                  )}
                 </div>
               ))}
               <input
@@ -663,19 +803,31 @@ export default function Home() {
             onClick={() =>
               setNewData({
                 HOTEN: "",
+                TENKHAC: "",
                 NAMSINH: "",
-                GIOITINH: "",
+                GIOITINH: false,
                 DANTOC: "",
                 TONGIAO: "",
                 CCCD: "",
                 SOHOK: "",
                 NOITHTRU: "",
                 TENCHA: "",
+                TENME: "",
+                TENVO: "",
                 CHARGE: "",
                 JUDGMENT: "",
                 DETENTION: "",
                 DAYARRES: "",
                 FREEDAY: "",
+                VANGNHA: false,
+                ANNINH: false,
+                MATUY: false,
+                TUTHA: false,
+                THACD: false,
+                TIENSU: false,
+                GHICHU: "",
+                LINKFOLDER: "",
+                LOCATION: "",
               })
             }
             style={{
