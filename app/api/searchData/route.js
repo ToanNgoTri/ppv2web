@@ -46,7 +46,7 @@ export async function POST(req) {
       query = query.match(criteria);
     }
 
-    // 🏷️ Các ô phân loại bật/tắt (ANNINH, MATUY, TUTHA, THACD, TIENSU...).
+    // 🏷️ Các ô phân loại bật/tắt (ANNINH, MATUY, TUTHA, THACD, TIENSU, TREHU...).
     // Chỉ ô nào được bật mới thêm điều kiện — không bật ô nào thì không lọc,
     // tức là tìm tất cả.
     for (const [key, on] of Object.entries(flags)) {

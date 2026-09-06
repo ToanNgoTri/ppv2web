@@ -40,6 +40,7 @@ const BOOLEAN_LABELS = {
   TUTHA: { true: "Có", false: "Không" },
   THACD: { true: "Có", false: "Không" },
   TIENSU: { true: "Có", false: "Không" },
+  TREHU: { true: "Có", false: "Không" },
 };
 
 // Phân loại đối tượng — lọc bằng ô bấm ở trên vùng tìm kiếm, không phải ô gõ
@@ -50,6 +51,7 @@ const FLAG_LABELS = {
   TUTHA: "Tù tha",
   THACD: "THA CĐ",
   TIENSU: "Tiền sự",
+  TREHU: "Trẻ em hư",
 };
 
 // Cột chỉ để xem/sửa, không đưa vào ô "Chọn Dữ liệu" vì tìm theo nó vô nghĩa.
@@ -112,6 +114,7 @@ export default function Home() {
     TUTHA: "TÙ THA",
     THACD: "THA CĐ",
     TIENSU: "TIỀN SỰ",
+    TREHU: "TRẺ EM HƯ",
     GHICHU: "GHI CHÚ",
     LINKFOLDER: "LINK HỒ SƠ",
     LOCATION: "TOẠ ĐỘ",
@@ -825,6 +828,7 @@ export default function Home() {
                 TUTHA: false,
                 THACD: false,
                 TIENSU: false,
+                TREHU: false,
                 GHICHU: "",
                 LINKFOLDER: "",
                 LOCATION: "",
