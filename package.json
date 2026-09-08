@@ -7,7 +7,6 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "dong-goi": "node scripts/dong-goi.mjs",
     "dong-goi:mac": "node scripts/dong-goi.mjs --mac",
     "dong-goi:win": "node scripts/dong-goi.mjs --windows"
   },

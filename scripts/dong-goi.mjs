@@ -22,26 +22,29 @@ const TEN_APP = 'ppv2web'
 
 // ── hướng dẫn ───────────────────────────────────────────────────────────────
 const HUONG_DAN = `Cách dùng:
-  npm run dong-goi:mac              gói cho macOS
-  npm run dong-goi:win              gói cho Windows 64-bit
-  node scripts/dong-goi.mjs [cờ...]
+  npm run dong-goi:win              gói POPULATION cho Windows 64-bit
+  npm run dong-goi:mac              gói POPULATION cho macOS
+  node scripts/dong-goi.mjs [cờ]    khi cần cờ khác — gọi thẳng, đừng qua npm run
 
 Cờ — viết kiểu nào cũng nhận (--windows, -windows, windows, win, WIN):
   --windows            đóng gói cho Windows 64-bit
   --mac                đóng gói cho macOS (mặc định = hệ đang chạy)
+  --du-an <tên>        dự án Supabase nướng vào gói — MẶC ĐỊNH: population
+  --population         = --du-an population  (gói phát cho người khác)
+  --hanggon            = --du-an hanggon     (gói cho Công an phường Hàng Gòn)
   --khong-node         không nhúng Node (máy đích phải tự có Node >= 20)
-  --khong-env          KHÔNG mang .env.local theo (không nhúng khoá Supabase)
+  --khong-env          KHÔNG nhúng khoá Supabase vào gói (máy đích tự điền)
   --ra <thư mục>       đặt gói vào thư mục khác, ví dụ:  --ra D:\\USB
   --help               in bảng này
 
-Ví dụ đóng gói Windows ra thẳng USB:
-  node scripts/dong-goi.mjs --windows --ra D:\\USB
+Ví dụ:
+  node scripts/dong-goi.mjs --windows --hanggon       gói hanggon cho Windows
+  node scripts/dong-goi.mjs --windows --ra D:\\USB     đóng thẳng ra USB
   node scripts/dong-goi.mjs --windows --ra /Volumes/USB
 
-QUAN TRỌNG khi chạy qua npm: phải có -- trước cờ.
-  ĐÚNG :  npm run dong-goi -- --windows
-  SAI  :  npm run dong-goi --windows      <- npm ăn mất cờ, bạn nhận gói của hệ mặc định
-Dùng  npm run dong-goi:win  thì không phải nhớ chuyện này.`
+Gói LUÔN lấy env từ .env.<dự-án>.local, KHÔNG lấy từ .env.local.
+.env.local là môi trường bạn chạy npm run dev hằng ngày — đóng gói không đọc nó,
+và cũng không sửa nó.`
 
 // ── đọc cờ ──────────────────────────────────────────────────────────────────
 /** Mặc định đóng cho chính hệ đang chạy, vì đó là ý người dùng hay muốn nhất. */
@@ -49,6 +52,18 @@ let hdh = process.platform === 'win32' ? 'windows' : 'mac'
 let nhungNode = true
 let mangEnv = true
 let thuMucRa = ''
+
+/**
+ * Dự án Supabase nướng vào gói. MẶC ĐỊNH population, và CỐ Ý không đọc .env.local.
+ *
+ * .env.local là môi trường làm việc hằng ngày (hanggon), bị đổi qua đổi lại liên
+ * tục. Nếu đóng gói ăn theo nó thì gói phát cho người khác trỏ về dự án nào là
+ * chuyện ngẫu nhiên theo lần cuối ai sửa file. Đã bị đúng lỗi đó một lần:
+ * .env.local ghi comment "POPULATION" nhưng URL bên trong là hanggon, cả gói đi
+ * lệch dự án mà không ai thấy. Nguồn env của việc đóng gói giờ là
+ * .env.<dự-án>.local, tách hẳn khỏi .env.local.
+ */
+let duAn = 'population'
 
 const args = process.argv.slice(2)
 for (let i = 0; i < args.length; i++) {
@@ -58,6 +73,15 @@ for (let i = 0; i < args.length; i++) {
     hdh = 'windows'
   } else if (['--mac', '-mac', 'mac', '--macos', '-macos', 'macos', '-m'].includes(co)) {
     hdh = 'mac'
+  } else if (['--du-an', '-du-an', '--du_an', '--duan', '--project', '-p'].includes(co)) {
+    duAn = (args[++i] ?? '').toLowerCase()
+    if (!duAn) thoat('✗ Cờ --du-an cần kèm tên dự án, ví dụ:  --du-an population')
+  } else if (co.startsWith('--du-an=') || co.startsWith('--duan=') || co.startsWith('--project=')) {
+    duAn = goc.slice(goc.indexOf('=') + 1).toLowerCase()
+  } else if (['--population', '-population', 'population', '--pop'].includes(co)) {
+    duAn = 'population'
+  } else if (['--hanggon', '-hanggon', 'hanggon', '--hg'].includes(co)) {
+    duAn = 'hanggon'
   } else if (
     ['--khong-node', '-khong-node', 'khong-node', '--khong_node', '--no-node', '-no-node'].includes(co)
   ) {
@@ -103,14 +127,15 @@ if ([resolve('/'), homedir()].includes(RA) || thuMucRa === resolve('/')) {
 }
 
 console.log(`▶ Đóng gói cho: ${hdh}`)
+console.log(`  Dự án Supabase: ${duAn}`)
 console.log(`  Sẽ ghi vào: ${RA}`)
 console.log(`  Đang chạy trên: ${process.platform} ${process.arch}\n`)
 
 // ── tiện ích ────────────────────────────────────────────────────────────────
 /** Chạy một lệnh, thừa hưởng stdio. shell:true để npm/tar trên Windows cũng gọi được. */
-function chay(lenh, { im = false, cwd } = {}) {
+function chay(lenh, { im = false, cwd, env } = {}) {
   return new Promise((ok, loi) => {
-    const p = spawn(lenh, { shell: true, cwd, stdio: im ? 'ignore' : 'inherit' })
+    const p = spawn(lenh, { shell: true, cwd, env, stdio: im ? 'ignore' : 'inherit' })
     p.on('error', loi)
     p.on('exit', (ma) => (ma === 0 ? ok() : loi(new Error(`Lệnh thất bại (${ma}): ${lenh}`))))
   })
@@ -125,12 +150,13 @@ async function coFile(p) {
   }
 }
 
-// ── 0. chặn sớm: máy đóng gói PHẢI có .env.local ────────────────────────────
+// ── 0. chặn sớm: phải có file env của DỰ ÁN ĐANG ĐÓNG GÓI ───────────────────
 /**
- * Máy vừa `git clone` / `git pull` thì KHÔNG có .env.local (bị .gitignore).
- * Build khi thiếu env sẽ chết ở bước "Collecting page data" với thông báo
- * `Error: supabaseUrl is required` trỏ vào .next/server/chunks/… — nhìn không ra
- * nguyên nhân thật. Chặn ngay ở đây kèm hướng dẫn cụ thể.
+ * Nguồn env của đóng gói là .env.<dự-án>.local, KHÔNG phải .env.local.
+ * Máy vừa `git clone` / `git pull` thì chưa có file nào trong số đó (.gitignore
+ * bỏ qua *.local). Build khi thiếu env sẽ chết ở bước "Collecting page data" với
+ * thông báo `Error: supabaseUrl is required` trỏ vào .next/server/chunks/… —
+ * nhìn không ra nguyên nhân thật. Chặn ngay ở đây kèm hướng dẫn cụ thể.
  *
  * Lý do build BẮT BUỘC cần env, không thể để máy đích tự điền sau:
  * các API route gọi createClient(process.env.SUPABASE_URL, …) ở cấp module, nên
@@ -143,28 +169,48 @@ const BIEN_CAN_CO = [
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
 ]
 
-const F_ENV = join(GOC, '.env.local')
-if (!(await coFile(F_ENV))) {
-  console.error('✗ Không có .env.local — KHÔNG build được, nên cũng không đóng gói được.\n')
-  console.error('  Máy vừa pull code thì chưa có file này (.gitignore bỏ qua nó).')
-  console.error('  Hai file mẫu ĐÃ nằm trong git, chọn một rồi điền 2 khoá:\n')
-  console.error('      cp .env.hanggon.example .env.local        # dự án HANGGON')
-  console.error('      cp .env.population.example .env.local    # dự án POPULATION\n')
-  console.error('  Rồi điền SUPABASE_SERVICE_ROLE_KEY và NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  console.error('  (Supabase → Project Settings → API), sau đó chạy lại lệnh đóng gói.')
+/** Đọc file env đủ dùng để kiểm; app dùng bộ đọc của Next. */
+function docEnv(noiDung) {
+  const ra = {}
+  for (const dong of noiDung.split(/\r?\n/)) {
+    const m = dong.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
+    if (m) ra[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
+  }
+  return ra
+}
+
+/** Dự án dùng được = các file .env.<tên>.example nằm trong git. */
+const DU_AN_CO = (await readdir(GOC))
+  .map((f) => /^[.]env[.]([a-z0-9-]+)[.]example$/.exec(f)?.[1])
+  .filter(Boolean)
+  .sort()
+
+if (!DU_AN_CO.includes(duAn)) {
+  console.error(`✗ Không biết dự án "${duAn}".\n`)
+  console.error(`  Dự án dùng được: ${DU_AN_CO.join(', ')}`)
+  console.error('  Ví dụ:  npm run dong-goi:win -- --du-an population')
   process.exit(1)
 }
 
-/** Đọc .env.local đủ dùng để kiểm; app dùng bộ đọc của Next. */
-const envGoc = {}
-for (const dong of (await readFile(F_ENV, 'utf8')).split(/\r?\n/)) {
-  const m = dong.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
-  if (m) envGoc[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
+const TEN_DU_AN = duAn.toUpperCase()
+const F_ENV = join(GOC, `.env.${duAn}.local`)
+
+if (!(await coFile(F_ENV))) {
+  console.error(`✗ Không có .env.${duAn}.local — KHÔNG đóng gói được cho ${TEN_DU_AN}.\n`)
+  console.error('  Máy vừa pull code thì chưa có file này (.gitignore bỏ qua nó).')
+  console.error('  File mẫu ĐÃ nằm trong git, copy rồi điền 2 khoá:\n')
+  console.error(`      cp .env.${duAn}.example .env.${duAn}.local\n`)
+  console.error('  Rồi điền SUPABASE_SERVICE_ROLE_KEY và NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  console.error('  (Supabase → Project Settings → API), sau đó chạy lại lệnh đóng gói.\n')
+  console.error('  Lưu ý: .env.local KHÔNG dùng để đóng gói — nó là môi trường npm run dev.')
+  process.exit(1)
 }
+
+const envGoc = docEnv(await readFile(F_ENV, 'utf8'))
 
 const thieuEnv = BIEN_CAN_CO.filter((k) => !envGoc[k])
 if (thieuEnv.length) {
-  console.error('✗ .env.local có nhưng thiếu giá trị — build sẽ chết ở "Collecting page data".\n')
+  console.error(`✗ .env.${duAn}.local thiếu giá trị — build sẽ chết ở "Collecting page data".\n`)
   for (const k of thieuEnv) console.error(`      ${k}=`)
   console.error('\n  Điền nốt rồi chạy lại. Lấy khoá ở Supabase → Project Settings → API.')
   process.exit(1)
@@ -172,13 +218,36 @@ if (thieuEnv.length) {
 
 /**
  * NEXT_PUBLIC_* bị NƯỚNG CỨNG vào bundle lúc build (cả phía client lẫn server,
- * kể cả middleware.js). Nên gói bị khoá vào đúng dự án Supabase đang dùng LÚC
- * NÀY — đổi .env.local trong gói đã đóng KHÔNG đổi được dự án cho phía trình
- * duyệt. Ghi lại URL này vào gói để launcher phát hiện khi bị lắp lẫn.
+ * kể cả middleware.js). Nên gói bị khoá vào đúng dự án chọn bằng --du-an — đổi
+ * .env.local trong gói đã đóng KHÔNG đổi được dự án cho phía trình duyệt.
+ * Ghi lại URL này vào gói để launcher phát hiện khi bị lắp lẫn.
  */
 const DU_AN_BUILD = envGoc.NEXT_PUBLIC_SUPABASE_URL
-console.log(`▶ 0/5  Kiểm .env.local — OK`)
-console.log(`  Dự án Supabase sẽ được NƯỚNG vào gói: ${DU_AN_BUILD}`)
+
+/**
+ * Đối chiếu URL với .env.<dự-án>.example — file đó nằm trong git, là bản ghi
+ * chính thức của "dự án này ở URL nào". Bắt đúng lỗi đã xảy ra một lần: file env
+ * bị lắp URL của dự án khác trong khi tên file và dòng comment vẫn nói dự án này.
+ */
+const URL_CHUAN = docEnv(await readFile(join(GOC, `.env.${duAn}.example`), 'utf8'))
+  .NEXT_PUBLIC_SUPABASE_URL
+if (URL_CHUAN && URL_CHUAN !== DU_AN_BUILD) {
+  console.error(`✗ .env.${duAn}.local trỏ SAI dự án — dừng, không đóng gói.\n`)
+  console.error(`  .env.${duAn}.example (chuẩn):   ${URL_CHUAN}`)
+  console.error(`  .env.${duAn}.local   (đang có): ${DU_AN_BUILD}`)
+  console.error(`\n  Sửa SUPABASE_URL + NEXT_PUBLIC_SUPABASE_URL trong .env.${duAn}.local`)
+  console.error('  cho khớp file .example, rồi chạy lại.')
+  process.exit(1)
+}
+
+console.log(`▶ 0/5  Kiểm .env.${duAn}.local — OK`)
+console.log('  ┌────────────────────────────────────────────────')
+console.log(`  │ DỰ ÁN NƯỚNG VÀO GÓI:  ${TEN_DU_AN}`)
+console.log(`  │ ${DU_AN_BUILD}`)
+console.log(`  │ nguồn env: .env.${duAn}.local`)
+console.log('  └────────────────────────────────────────────────')
+console.log('  Dự án khác:  npm run dong-goi:win -- --du-an <tên>')
+console.log('  (.env.local của bạn KHÔNG ảnh hưởng gói này — nó chỉ dùng cho npm run dev)')
 if (envGoc.SUPABASE_URL !== DU_AN_BUILD) {
   console.log(`  ⚠ SUPABASE_URL (${envGoc.SUPABASE_URL}) KHÁC NEXT_PUBLIC_SUPABASE_URL.`)
   console.log('    Hai biến này phải là cùng một URL, nếu không phía server và phía')
@@ -193,7 +262,15 @@ console.log()
 console.log('▶ 1/5  Build production (webpack, không Turbopack)')
 await rm(RA, { recursive: true, force: true })
 await rm(join(GOC, '.next'), { recursive: true, force: true })
-await chay('npx next build', { im: true })
+/**
+ * Nhồi env của dự án vào process.env của tiến trình con, KHÔNG sửa .env.local.
+ *
+ * Thứ tự ưu tiên của @next/env: process.env ĐỨNG TRƯỚC mọi file .env — bộ nạp
+ * chỉ gán biến nào chưa có trong process.env. Nên truyền sẵn ở đây là build ăn
+ * dự án đóng gói, còn .env.local (hanggon, để npm run dev) nằm im: không bị sửa,
+ * không phải đổi qua đổi lại, và Ctrl+C giữa build cũng không để lại file lẫn dự án.
+ */
+await chay('npx next build', { im: true, env: { ...process.env, ...envGoc } })
 
 // ── 2. gom standalone ───────────────────────────────────────────────────────
 console.log('▶ 2/5  Gom bản standalone')
@@ -225,16 +302,18 @@ await cp(join(GOC, '.next', 'static'), join(RA, '.next', 'static'), CHEP)
 if (!(await coFile(join(GOC, 'public')))) thoat('✗ Không thấy thư mục public/')
 await cp(join(GOC, 'public'), join(RA, 'public'), CHEP)
 
-// .env.local mang theo để máy đích chạy được ngay.
+// Mang env theo để máy đích chạy được ngay.
 // KHOÁ SUPABASE (kể cả service role) sẽ nằm trong gói — xem cờ --khong-env.
 if (mangEnv) {
-  if (await coFile(join(GOC, '.env.local'))) {
-    await cp(join(GOC, '.env.local'), join(RA, '.env.local'))
-    console.log('  ⚠ Đã nhúng .env.local (có SUPABASE_SERVICE_ROLE_KEY) vào gói.')
-    console.log('    Ai có gói này là có toàn quyền ghi/xoá database. Đừng phát tán bừa.')
-  } else {
-    console.log('  ⚠ Không thấy .env.local — máy đích sẽ phải tự tạo file này.')
-  }
+  /**
+   * Nguồn là .env.<dự-án>.local, vào gói với tên .env.local — tên mà Next và
+   * khoi-dong.mjs đọc lúc chạy. PHẢI cùng dự án với bundle vừa build, nếu không
+   * trình duyệt nói với dự án nướng sẵn còn API server nói với dự án trong file
+   * này: hai bên hai database, lỗi cực khó lần.
+   */
+  await cp(F_ENV, join(RA, '.env.local'))
+  console.log(`  ⚠ Đã nhúng .env.${duAn}.local (có SUPABASE_SERVICE_ROLE_KEY) vào gói.`)
+  console.log('    Ai có gói này là có toàn quyền ghi/xoá database. Đừng phát tán bừa.')
 } else {
   /**
    * Chỉ để lại đúng hai biến MÀ MÁY ĐÍCH THỰC SỰ ĐỔI ĐƯỢC.
@@ -248,7 +327,7 @@ if (mangEnv) {
       '# Đổi tên file này thành .env.local rồi điền giá trị thật.',
       '# Lấy ở Supabase -> Project Settings -> API',
       '#',
-      `# Gói này đã được build cho dự án: ${DU_AN_BUILD}`,
+      `# Gói này đã được build cho dự án: ${TEN_DU_AN} — ${DU_AN_BUILD}`,
       '# URL đó và khoá ANON đã nằm sẵn trong bundle, KHÔNG sửa được từ đây.',
       '# Chỉ hai biến dưới là đọc lúc chạy:',
       '',
@@ -272,7 +351,8 @@ if (mangEnv) {
  */
 await writeFile(
   join(RA, 'thong-tin-goi.json'),
-  JSON.stringify({ duAnBuild: DU_AN_BUILD, hdh, nhungNode, mangEnv }, null, 2) + '\n',
+  JSON.stringify({ duAn: TEN_DU_AN, duAnBuild: DU_AN_BUILD, hdh, nhungNode, mangEnv }, null, 2) +
+    '\n',
   'utf8',
 )
 
@@ -602,6 +682,7 @@ if (nhungNode && CUNG_HE) {
 
 const tenGoi = basename(RA)
 console.log(`\n✓ Xong: ${RA}`)
+console.log(`  Dự án Supabase trong gói: ${TEN_DU_AN} (${DU_AN_BUILD})`)
 console.log(`  Hệ điều hành đích: ${hdh}`)
 if (!CUNG_HE) {
   console.log(`\n  ⚠ Gói ${hdh} này được tạo từ ${process.platform} nên CHƯA chạy thử trên hệ đích.`)

@@ -90,7 +90,7 @@ if (existsSync(F_TT)) {
       console.error('  không sửa được từ .env.local. Chạy tiếp sẽ ra tình trạng đăng nhập được')
       console.error('  nhưng dữ liệu đọc/ghi sai dự án.\n')
       console.error('  Cách sửa: sửa SUPABASE_URL trong .env.local về đúng URL trên,')
-      console.error('  hoặc đóng gói lại từ project với .env.local của dự án bạn muốn.')
+      console.error('  hoặc đóng gói lại ở project:  node scripts/dong-goi.mjs --du-an <tên>')
       await dungLai()
     }
   } catch {

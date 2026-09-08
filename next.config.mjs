@@ -1,10 +1,24 @@
+// Host ảnh phải theo ĐÚNG dự án Supabase trong .env.local, không viết cứng:
+// gõ cứng một ref (cppilyhbusukcmrwpvfc) là đổi dự án xong ảnh chân dung im lặng
+// hỏng. Thêm cả wildcard *.supabase.co làm lưới an toàn cho mọi dự án.
+const HOST_ANH = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+  } catch {
+    return null
+  }
+})()
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
     remotePatterns: [
+      ...(HOST_ANH
+        ? [{ protocol: "https", hostname: HOST_ANH, pathname: "/storage/v1/object/public/**" }]
+        : []),
       {
         protocol: "https",
-        hostname: "cppilyhbusukcmrwpvfc.supabase.co",
+        hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
     ],
