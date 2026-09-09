@@ -336,6 +336,7 @@ export default function Home() {
                   width: 250,
                   textTransform: "uppercase",
                 }}
+                id={`input${num}`}
                 value={currentInput}
                 onChange={(e) => setCurrentInput(e.target.value)}
                 placeholder="NHẬP THÔNG TIN"
@@ -367,6 +368,7 @@ export default function Home() {
             Xóa dữ liệu
           </button>
           <button
+          id="search"
             onClick={() => search()}
             disabled={loading}
             style={{
