@@ -47,8 +47,10 @@ export async function POST(req) {
     }
 
     // 🏷️ Các ô phân loại bật/tắt (ANNINH, MATUY, TUTHA, THACD, TIENSU, TREHU...).
-    // Chỉ ô nào được bật mới thêm điều kiện — không bật ô nào thì không lọc,
-    // tức là tìm tất cả.
+    // Gộp các ô đã bật bằng HOẶC: bật "Ma túy" + "Tù tha" là ra đối tượng ma
+    // túy CỘNG đối tượng tù tha, chứ không phải người vừa ma túy vừa tù tha.
+    // Không bật ô nào thì không lọc, tức là tìm tất cả.
+    const flagsDaBat = [];
     for (const [key, on] of Object.entries(flags)) {
       if (!on) continue;
       if (!laCotBoolean(table, key)) {
@@ -57,7 +59,13 @@ export async function POST(req) {
           { status: 400 },
         );
       }
-      query = query.eq(key, true);
+      flagsDaBat.push(key);
+    }
+    if (flagsDaBat.length) {
+      // Nhóm `or(...)` vẫn nối VÀ với các điều kiện gõ tay ở trên, nên tìm
+      // "HỌ TÊN = A" + ô "Ma túy"/"Tù tha" ra đúng người tên A thuộc một
+      // trong hai loại.
+      query = query.or(flagsDaBat.map((k) => `${k}.eq.true`).join(","));
     }
 
     // 👉 Giới hạn số dòng trả về. Để 1000 (trần một lần gọi của PostgREST) vì

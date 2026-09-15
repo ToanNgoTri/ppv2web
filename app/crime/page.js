@@ -44,7 +44,8 @@ const BOOLEAN_LABELS = {
 };
 
 // Phân loại đối tượng — lọc bằng ô bấm ở trên vùng tìm kiếm, không phải ô gõ
-// chữ. Không bấm ô nào = không lọc = tìm tất cả.
+// chữ. Bấm nhiều ô là CỘNG DỒN các nhóm (ma túy HOẶC tù tha), không phải đòi
+// đối tượng có đủ mọi nhãn. Không bấm ô nào = không lọc = tìm tất cả.
 const FLAG_LABELS = {
   ANNINH: "An ninh",
   MATUY: "Ma túy",
@@ -362,7 +363,8 @@ export default function Home() {
             CÔNG CỤ TÌM KIẾM ĐỐI TƯỢNG
           </div>
 
-          {/* Ô PHÂN LOẠI — bấm để lọc, không bấm ô nào thì tìm tất cả */}
+          {/* Ô PHÂN LOẠI — bấm nhiều ô là cộng dồn các nhóm, không bấm ô nào
+              thì tìm tất cả */}
           <div
             style={{
               display: "flex",
@@ -397,6 +399,18 @@ export default function Home() {
                 </button>
               );
             })}
+          </div>
+
+          <div
+            style={{
+              marginBottom: 20,
+              fontSize: 13,
+              color: "#6c757d",
+              textAlign: "center",
+            }}
+          >
+            Bấm nhiều ô phân loại sẽ ra tất cả đối tượng thuộc một trong các
+            nhóm đã chọn.
           </div>
 
           {[1, 2, 3].map((num) => {
