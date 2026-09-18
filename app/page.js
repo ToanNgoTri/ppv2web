@@ -16,6 +16,9 @@ export default function Page() {
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          maxWidth: "80vw",
           gap: "20px",
           padding: "30px",
           background: "#fff",
@@ -61,7 +64,26 @@ export default function Page() {
           Crime
         </a>
 
-                <a
+        <a
+          href="/statistics"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            padding: "14px 28px",
+            background: "#8b5cf6",
+            color: "#fff",
+            borderRadius: "10px",
+            textDecoration: "none",
+            fontWeight: "600",
+            transition: "0.3s",
+          }}
+          onMouseOver={(e) => (e.currentTarget.style.opacity = "0.8")}
+          onMouseOut={(e) => (e.currentTarget.style.opacity = "1")}
+        >
+          Thống kê
+        </a>
+
+        <a
           href="/generatedocs"
           target="_blank"
           rel="noopener noreferrer"

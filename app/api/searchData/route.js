@@ -28,22 +28,32 @@ export async function POST(req) {
 
     let query = supabaseAdmin.from(table).select("*");
 
-    // 🔍 Tạo truy vấn theo kiểu fuzzy (ilike) hoặc exact (match)
-    if (fuzzy) {
-      for (const [key, value] of Object.entries(criteria)) {
-        if (laCotBoolean(table, key)) {
-          // 👉 cột boolean: ilike sẽ làm hỏng câu truy vấn, phải so bằng
-          query = query.eq(key, doiSangBoolean(value));
-        } else if (key === "SOHOK") {
-          // 👉 exact match
-          query = query.eq(key, value);
-        } else {
-          // 👉 fuzzy match
-          query = query.ilike(key, `%${value}%`);
-        }
+    // `criteria` nhận cả hai dạng:
+    //   - mảng [{ key, value }, ...]  → giữ được nhiều điều kiện trên CÙNG một
+    //     cột (ví dụ HỌ TÊN chứa "NGUYỄN" VÀ HỌ TÊN chứa "VĂN A")
+    //   - object { key: value }       → dạng cũ, một cột một điều kiện
+    // Trước đây chỉ có dạng object nên hai ô "Chọn Dữ liệu" cùng cột thì ô sau
+    // đè mất ô trước, tìm ra tập rộng hơn ý người dùng.
+    const dieuKien = Array.isArray(criteria)
+      ? criteria
+          .map((c) => (Array.isArray(c) ? { key: c[0], value: c[1] } : c))
+          .filter((c) => c && c.key != null)
+          .map((c) => [c.key, c.value])
+      : Object.entries(criteria || {});
+
+    // 🔍 Tạo truy vấn theo kiểu fuzzy (ilike) hoặc exact (eq).
+    // Mọi điều kiện đều nối bằng VÀ: chain .eq()/.ilike() trên PostgREST là AND.
+    for (const [key, value] of dieuKien) {
+      if (laCotBoolean(table, key)) {
+        // 👉 cột boolean: ilike sẽ làm hỏng câu truy vấn, phải so bằng
+        query = query.eq(key, doiSangBoolean(value));
+      } else if (!fuzzy || key === "SOHOK") {
+        // 👉 exact match
+        query = query.eq(key, value);
+      } else {
+        // 👉 fuzzy match
+        query = query.ilike(key, `%${value}%`);
       }
-    } else {
-      query = query.match(criteria);
     }
 
     // 🏷️ Các ô phân loại bật/tắt (ANNINH, MATUY, TUTHA, THACD, TIENSU, TREHU...).

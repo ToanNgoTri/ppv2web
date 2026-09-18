@@ -98,13 +98,20 @@ export default function Home() {
   async function search() {
     setLoading(true);
     try {
-      const filters = {};
-      if (input1.trim()) filters[select1] = input1.trim().toUpperCase();
-      if (input2.trim()) filters[select2] = input2.trim().toUpperCase();
-      if (input3.trim()) filters[select3] = input3.trim().toUpperCase();
+      // Mảng chứ không phải object: ba ô "Chọn Dữ liệu" có thể cùng trỏ vào
+      // một cột (mặc định cả ba đều là HỌ TÊN). Dạng object thì ô sau đè mất ô
+      // trước, chỉ còn một điều kiện nên kết quả rộng ra như thể HOẶC. Dạng
+      // mảng giữ đủ cả ba và máy chủ nối chúng bằng VÀ.
+      const filters = [];
+      const themDieuKien = (key, value) => {
+        if (value.trim()) filters.push({ key, value: value.trim().toUpperCase() });
+      };
+      themDieuKien(select1, input1);
+      themDieuKien(select2, input2);
+      themDieuKien(select3, input3);
 
       const flagsBat = Object.values(flags).some(Boolean);
-      if (Object.keys(filters).length === 0 && !flagsBat) {
+      if (filters.length === 0 && !flagsBat) {
         alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
         return;
       }
