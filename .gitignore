@@ -44,3 +44,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# sổ hộ KV2 xuất ra (scripts/xuat-so-ho.mjs) — dữ liệu dân cư, không đưa lên git
+/xuat-so-ho
