@@ -1,10 +1,15 @@
 /**
- * Xuất sổ hộ gia đình mẫu KV2: mỗi hộ một trang A4 ngang, gom thành MỘT FILE
- * .docx CHO MỖI TỔ (trong từng khu phố) để in và đóng cuốn.
+ * Xuất sổ hộ gia đình mẫu KV2: mỗi hộ MỘT CẶP TRANG ĐỐI DIỆN A4 ngang (trang
+ * trái cột 1–10, trang phải cột 11–18), gom thành MỘT FILE .docx CHO MỖI TỔ
+ * (trong từng khu phố) để in hai mặt và đóng cuốn. Mỗi file: mục lục ở đầu
+ * (số trang lẻ, 40 hộ/trang), rồi các hộ (mỗi hộ 2 trang). Số trang đánh từ 3
+ * vì bìa (trang 1) và trang Cán bộ quản lý (trang 2) in riêng — xem
+ * public/templates/KV2-trang-1-bia.docx, KV2-trang-2-can-bo-quan-ly.docx. Lề đối xứng có gutter phía gáy — in hai mặt, lật
+ * theo cạnh ngắn (short-edge).
  *
- * Vì sao không in từ trang web: cả phường ~5.400 hộ = 5.400 trang, mỗi trang
- * một bảng 20 dòng × 18 cột. Trình duyệt dựng một lượt là treo. Script này
- * chạy một lần ở máy có project, ghi file ra đĩa, mỗi tổ vài trăm KB.
+ * Vì sao không in từ trang web: cả phường ~5.400 hộ = ~10.800 trang, mỗi trang
+ * một bảng 20 dòng. Trình duyệt dựng một lượt là treo. Script này chạy một lần
+ * ở máy có project, ghi file ra đĩa, mỗi tổ vài trăm KB.
  *
  *   node scripts/xuat-so-ho.mjs --kp "HÀNG GÒN" --to 10      một tổ
  *   node scripts/xuat-so-ho.mjs --kp "HÀNG GÒN"              cả khu phố, mỗi tổ một file
@@ -21,6 +26,7 @@
  *   QUANHE = CHỦ HỘ → tên trên đầu trang      GIOITINH → ngày sinh vào cột Nam hay Nữ
  * Cột (6) Quê quán, (11)–(16) không có trong CSDL → để trống điền tay.
  * Cột (9) Quốc tịch in sẵn "Việt Nam".
+ * DELETED = true (nhân khẩu đã xóa) → vẫn in, nhưng gạch ngang cả dòng.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -28,7 +34,10 @@ import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
-import { DUONG_DAN_MAU, DONG_MOI_TRANG, ghiMauKV2 } from './mau-kv2.mjs'
+import {
+  DUONG_DAN_MAU, DONG_MOI_TRANG, DONG_MUC_LUC_MOI_KHOI, HO_MUC_LUC_MOI_TRANG,
+  ghiMauKV2, trangCuaCapThu,
+} from './mau-kv2.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const GOC = path.join(__dirname, '..')
@@ -72,7 +81,7 @@ function docEnv(duAn) {
 }
 
 // ---- Đọc dữ liệu --------------------------------------------------------------
-const COT_DOC = 'SOHOK,HOTEN,QUANHE,NAMSINH,GIOITINH,CCCD,DANTOC,TONGIAO,NOITHTRU,SDT,GHICHU'
+const COT_DOC = 'SOHOK,HOTEN,QUANHE,NAMSINH,GIOITINH,CCCD,DANTOC,TONGIAO,NOITHTRU,SDT,GHICHU,DELETED'
 const TRANG = 1000 // PostgREST trả tối đa 1000 dòng một lần
 
 async function docTatCa(supabase) {
@@ -142,7 +151,7 @@ function namSinh(ns) {
 }
 
 /** Ô Ghi chú bị khoá chiều cao nên chỉ hiện được chừng này ký tự; dài hơn sẽ bị cắt khi in. */
-const GHI_CHU_TOI_DA = 40
+const GHI_CHU_TOI_DA = 55
 
 function gomHo(rows) {
   const theoSoHo = new Map()
@@ -185,7 +194,8 @@ function dongTrong() {
   return {
     TT: '', HOTEN: '', QUANHE: '', NAM: '', NU: '', QUEQUAN: '', CCCD: '', DANTOC: '',
     QUOCTICH: '', TONGIAO: '', NGHENGHIEP: '', ODAUDEN: '', CHUYENDI: '', THAIDO: '',
-    THUCTE: '', QHXH: '', SDT: '', GHICHU: '',
+    THUCTE: '', QHXH: '', SDT: '', GHICHU: '', SO: '',
+    XOA: false,
   }
 }
 
@@ -203,10 +213,12 @@ function dongNhanKhau(r, tt) {
     TONGIAO: hoaChuDau(r.TONGIAO),
     SDT: r.SDT || '',
     GHICHU: r.GHICHU || '',
+    // Nhân khẩu đã xóa vẫn in vào sổ nhưng gạch ngang cả dòng (xem mau-kv2.mjs)
+    XOA: r.DELETED === true,
   }
 }
 
-/** Một hộ → một hay nhiều trang (hộ trên 20 người thì sang trang tiếp, lặp đầu trang). */
+/** Một hộ → một hay nhiều cặp trang (hộ trên 20 người thì sang cặp tiếp, lặp đầu trang). */
 function trangCuaHo(ho) {
   const trang = []
   const ds = ho.nhanKhau
@@ -214,20 +226,75 @@ function trangCuaHo(ho) {
     const phan = ds.slice(tu, tu + DONG_MOI_TRANG)
     const NK = phan.map((r, i) => dongNhanKhau(r, tu + i + 1))
     while (NK.length < DONG_MOI_TRANG) NK.push(dongTrong())
+    // Số dòng sau cột Ghi chú (trang phải) — đánh cả dòng trống để dò ngang sang trang trái
+    NK.forEach((d, i) => { d.SO = String(tu + i + 1) })
     trang.push({ CHUHO: ho.chuHo, SOHOK: ho.soHo, DIACHI: ho.diaChi, NK })
   }
   return trang
 }
 
-function taoDocx(mauBuffer, cacHo) {
-  const HO = cacHo.flatMap(trangCuaHo).map((t, i) => ({ ...t, CHUA_DAU: i > 0 }))
+/**
+ * Mục lục đầu sổ: mỗi trang hai khối × 20 dòng. Mục lục bắt đầu ở trang 3 (bìa
+ * = 1, Cán bộ quản lý = 2, hai trang này in riêng) nên số trang mục lục phải LẺ
+ * (đệm thêm một trang mục lục trống nếu cần) để hộ đầu tiên rơi vào trang chẵn
+ * = trang trái. Trang trống đó cũng tiện ghi tay hộ phát sinh sau này.
+ */
+function trangMucLuc(cacHo, soTrangMucLuc) {
+  const muc = []
+  let cap = 0
+  for (const ho of cacHo) {
+    muc.push({
+      TT: String(muc.length + 1),
+      TEN: ho.chuHo,
+      LOAI: 'Hộ gia đình',
+      TRANG: String(trangCuaCapThu(cap, soTrangMucLuc)),
+    })
+    cap += ho.soCap
+  }
+  const trong = { TT: '', TEN: '', LOAI: '', TRANG: '' }
+  const ML = []
+  for (let t = 0; t < soTrangMucLuc; t++) {
+    const DONG = []
+    for (let d = 0; d < DONG_MUC_LUC_MOI_KHOI; d++) {
+      const trai = muc[t * HO_MUC_LUC_MOI_TRANG + d] || trong
+      const phai = muc[t * HO_MUC_LUC_MOI_TRANG + DONG_MUC_LUC_MOI_KHOI + d] || trong
+      DONG.push({
+        TT1: trai.TT, TEN1: trai.TEN, LOAI1: trai.LOAI, TRANG1: trai.TRANG,
+        TT2: phai.TT, TEN2: phai.TEN, LOAI2: phai.LOAI, TRANG2: phai.TRANG,
+      })
+    }
+    ML.push({ CHUA_DAU: t > 0, DONG })
+  }
+  return ML
+}
+
+/** Số trang mục lục cần cho n hộ, đệm thành số lẻ. */
+function soTrangMucLucCua(n) {
+  const can = Math.max(1, Math.ceil(n / HO_MUC_LUC_MOI_TRANG))
+  return can % 2 === 0 ? can + 1 : can
+}
+
+/** Một nhóm (khu phố, tổ) → một file. Trả về số trang: mục lục + hộ. */
+function taoDocx(mauBuffer, { ho: cacHo }) {
+  const HO = []
+  for (const ho of cacHo) {
+    const cap = trangCuaHo(ho)
+    ho.soCap = cap.length
+    HO.push(...cap)
+  }
+  const soTrangMucLuc = soTrangMucLucCua(cacHo.length)
+  const ML = trangMucLuc(cacHo, soTrangMucLuc)
   const doc = new Docxtemplater(new PizZip(mauBuffer), {
     paragraphLoop: true,
     linebreaks: true,
     nullGetter: () => '',
   })
-  doc.render({ HO })
-  return { buffer: doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' }), soTrang: HO.length }
+  doc.render({ ML, HO })
+  return {
+    buffer: doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' }),
+    soTrang: soTrangMucLuc + HO.length * 2,
+    soTrangMucLuc,
+  }
 }
 
 // ---- Chạy -----------------------------------------------------------------------
@@ -276,13 +343,13 @@ async function main() {
     const tenFile = co.motFileMoiKp
       ? `KV2-${khongDau(n.kp)}.docx`
       : `KV2-${khongDau(n.kp)}-To-${n.to ?? 'chua-ro'}.docx`
-    const { buffer, soTrang } = taoDocx(mauBuffer, n.ho)
+    const { buffer, soTrang, soTrangMucLuc } = taoDocx(mauBuffer, n)
     const duongDan = path.join(thuMuc, tenFile)
     fs.writeFileSync(duongDan, buffer)
     tongTrang += soTrang
-    console.log(`  ${path.relative(GOC, duongDan)}: ${n.ho.length} hộ, ${soTrang} trang, ${(buffer.length / 1024).toFixed(0)} KB`)
+    console.log(`  ${path.relative(GOC, duongDan)}: ${n.ho.length} hộ, ${soTrang} trang (${soTrangMucLuc} mục lục + ${soTrang - soTrangMucLuc} hộ), ${(buffer.length / 1024).toFixed(0)} KB`)
   }
-  console.log(`Xong: ${nhom.size} file, ${hoChon.length} hộ, ${tongTrang} trang → ${thuMucRa}`)
+  console.log(`Xong: ${nhom.size} file, ${hoChon.length} hộ, ${tongTrang} trang kể cả mục lục → ${thuMucRa}`)
 
   // Cảnh báo dữ liệu — chỉ những hộ nằm trong phạm vi đã chọn
   const trongPhamVi = new Set(hoChon.map((h) => h.soHo))

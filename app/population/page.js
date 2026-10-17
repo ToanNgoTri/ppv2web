@@ -45,6 +45,14 @@ const FLAG_LABELS = {
   CRIMINALRECORD: "Tiền án/tiền sự",
 };
 
+// Màu hàng của nhân khẩu đã xóa (DELETED = true): xám nhạt, chữ mờ, kiểu
+// "deactive" — vẫn hiện để tra lại, nhưng nhìn là biết không còn hiệu lực.
+const MAU_DA_XOA = { backgroundColor: "#3f3f46", color: "#a1a1aa" };
+
+// Màu hàng của người có tiền án/tiền sự (CRIMINALRECORD = true): xanh nhạt,
+// cùng mã màu với app ppv2. Nền sáng nên chữ phải tối mới đọc được.
+const MAU_TIEN_AN = { backgroundColor: "#90CAF9", color: "#0f172a" };
+
 export default function Home() {
   const router = useRouter();
 
@@ -184,17 +192,36 @@ export default function Home() {
     setNewData(null);
   }
 
-  async function deleteData(cccd) {
-    let supabase = await fetch("/api/deleteData", {
+  // Xóa mềm: máy chủ chỉ bật DELETED, dòng vẫn ở lại bảng (nền xám).
+  // `restore` = true là khôi phục lại.
+  async function deleteData(cccd, restore = false) {
+    if (!restore && !confirm("Đánh dấu nhân khẩu này là ĐÃ XÓA?")) return;
+
+    const res = await fetch("/api/deleteData", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         database: "population",
         CCCD: cccd,
+        restore,
       }),
     });
-    alert("Xóa dữ liệu thành công");
-    setData(data && data.filter((item) => item.CCCD !== cccd));
+    if (!res.ok) {
+      const loi = await res.json().catch(() => null);
+      alert(
+        "Không cập nhật được: " +
+          (loi?.error?.message || loi?.error || res.status),
+      );
+      return;
+    }
+
+    alert(restore ? "Đã khôi phục nhân khẩu" : "Đã đánh dấu nhân khẩu đã xóa");
+    setData(
+      data &&
+        data.map((item) =>
+          item.CCCD === cccd ? { ...item, DELETED: !restore } : item,
+        ),
+    );
   }
 
   async function fixData(cccd) {
@@ -551,9 +578,14 @@ export default function Home() {
                   /* --- HÀNG BÌNH THƯỜNG --- */
                   <tr
                     key={i}
-                    style={{
-                      backgroundColor: i % 2 === 0 ? "#1e293b" : "#0f172a",
-                    }}
+                    title={item.DELETED ? "Nhân khẩu đã xóa" : undefined}
+                    style={
+                      item.DELETED
+                        ? MAU_DA_XOA
+                        : item.CRIMINALRECORD
+                        ? MAU_TIEN_AN
+                        : { backgroundColor: i % 2 === 0 ? "#1e293b" : "#0f172a" }
+                    }
                   >
                     <td
                       style={{
@@ -563,6 +595,11 @@ export default function Home() {
                       }}
                     >
                       {i + 1}
+                      {item.DELETED && (
+                        <div style={{ fontSize: 11, fontWeight: 600 }}>
+                          ĐÃ XÓA
+                        </div>
+                      )}
                     </td>
                     {Object.keys(title).map((key) => (
                       <td
@@ -582,7 +619,13 @@ export default function Home() {
                             href={mapUrl(item[key])}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ color: "#93c5fd" }}
+                            style={{
+                              color: item.DELETED
+                                ? "inherit"
+                                : item.CRIMINALRECORD
+                                ? "#1d4ed8"
+                                : "#93c5fd",
+                            }}
                           >
                             📍 {item[key]}
                           </a>
@@ -617,9 +660,9 @@ export default function Home() {
                         Sửa
                       </button>
                       <button
-                        onClick={() => deleteData(item.CCCD)}
+                        onClick={() => deleteData(item.CCCD, !!item.DELETED)}
                         style={{
-                          backgroundColor: "#ef4444",
+                          backgroundColor: item.DELETED ? "#71717a" : "#ef4444",
                           color: "white",
                           border: "none",
                           borderRadius: 5,
@@ -628,7 +671,7 @@ export default function Home() {
                           marginRight: 4,
                         }}
                       >
-                        Xóa
+                        {item.DELETED ? "Khôi phục" : "Xóa"}
                       </button>
                       {/* ✅ NÚT TẠO HỒ SƠ MỚI */}
                       <button

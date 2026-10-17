@@ -210,6 +210,8 @@ export async function POST(req) {
 
     const taoQuery = () => {
       let q = supabaseAdmin.from(table).select([...cotCanLay].join(","));
+      // Nhân khẩu đã xóa (xóa mềm) không còn tính vào dân số.
+      if (table === "population") q = q.not("DELETED", "is", true);
       if (gender !== "all") q = q.eq("GIOITINH", gender === "nam");
       if (vang !== "all") q = q.eq("VANGNHA", vang === "vang");
       // Bật nhiều ô phân loại là nối VÀ: đối tượng phải thuộc ĐỦ các nhóm đã

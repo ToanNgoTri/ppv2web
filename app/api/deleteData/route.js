@@ -19,10 +19,13 @@ export async function POST(res) {
   const { table, response: bangLa } = checkTable(body.database)
   if (bangLa) return bangLa
 
-  const { data, error } = await supabaseAdmin
-    .from(table)
-    .delete()
-    .eq("CCCD", body.CCCD);
+  // Nhân khẩu không xóa hẳn khỏi bảng: chỉ bật cờ DELETED để còn tra lại được
+  // (giao diện hiện nền xám). `restore: true` là khôi phục. Bảng crime chưa có
+  // cột này nên vẫn xóa thật như cũ.
+  const query = table === "population"
+    ? supabaseAdmin.from(table).update({ DELETED: !body.restore })
+    : supabaseAdmin.from(table).delete();
+  const { data, error } = await query.eq("CCCD", body.CCCD);
   if (error) return Response.json({ error }, { status: 400 });
   return Response.json(error);
 }
