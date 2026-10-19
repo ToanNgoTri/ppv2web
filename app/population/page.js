@@ -37,6 +37,13 @@ const BOOLEAN_LABELS = {
   GIOITINH: { true: "Nam", false: "Nữ" },
   VANGNHA: { true: "Có", false: "Không" },
   CRIMINALRECORD: { true: "Có", false: "Không" },
+  DELETED: { true: "Đã xóa", false: "Chưa xóa" },
+};
+
+// Cột chỉ dùng làm điều kiện tìm, không hiện thành cột trong bảng. DELETED đã
+// có nền xám + nút Xóa/Khôi phục nên không cần thêm một cột riêng.
+const CHI_TIM = {
+  DELETED: "ĐÃ XÓA",
 };
 
 // Các cột được lọc bằng ô bấm ở trên vùng tìm kiếm thay vì ô nhập chữ.
@@ -99,9 +106,13 @@ export default function Home() {
 
   // Danh sách cột cho ô "Chọn Dữ liệu": bỏ các cột đã có ô bấm riêng và các
   // cột không tìm theo được.
-  const searchFields = Object.keys(title).filter(
-    (k) => !(k in FLAG_LABELS) && !KHONG_TIM.includes(k),
-  );
+  const searchFields = [
+    ...Object.keys(title).filter(
+      (k) => !(k in FLAG_LABELS) && !KHONG_TIM.includes(k),
+    ),
+    ...Object.keys(CHI_TIM),
+  ];
+  const searchLabel = (k) => title[k] ?? CHI_TIM[k];
 
   async function search() {
     setLoading(true);
@@ -112,7 +123,10 @@ export default function Home() {
       // mảng giữ đủ cả ba và máy chủ nối chúng bằng VÀ.
       const filters = [];
       const themDieuKien = (key, value) => {
-        if (value.trim()) filters.push({ key, value: value.trim().toUpperCase() });
+        // Cột boolean: ô chọn trả về đúng true/false, gửi nguyên kiểu
+        if (typeof value === "boolean") filters.push({ key, value });
+        else if (value.trim())
+          filters.push({ key, value: value.trim().toUpperCase() });
       };
       themDieuKien(select1, input1);
       themDieuKien(select2, input2);
@@ -348,17 +362,45 @@ export default function Home() {
                   border: "1px solid #475569",
                 }}
                 onChange={(e) => {
-                  if (num === 1) setSelect1(e.target.value);
-                  if (num === 2) setSelect2(e.target.value);
-                  if (num === 3) setSelect3(e.target.value);
+                  const field = e.target.value;
+                  if (num === 1) setSelect1(field);
+                  if (num === 2) setSelect2(field);
+                  if (num === 3) setSelect3(field);
+                  // Đổi giữa cột chữ và cột boolean thì giá trị cũ không còn
+                  // hợp kiểu: cột boolean mặc định true, cột chữ để trống.
+                  if (BOOLEAN_LABELS[field]) setCurrentInput(true);
+                  else if (typeof currentInput === "boolean")
+                    setCurrentInput("");
                 }}
               >
                 {searchFields.map((item) => (
                   <option key={item} value={item}>
-                    {title[item]}
+                    {searchLabel(item)}
                   </option>
                 ))}
               </select>
+              {BOOLEAN_LABELS[currentTitle] ? (
+                <select
+                  value={currentInput === false ? "FALSE" : "TRUE"}
+                  onChange={(e) => setCurrentInput(e.target.value === "TRUE")}
+                  style={{
+                    padding: 8,
+                    fontSize: 15,
+                    borderRadius: 6,
+                    border: "1px solid #475569",
+                    backgroundColor: "#0f172a",
+                    color: "white",
+                    width: 250,
+                  }}
+                >
+                  <option value="TRUE">
+                    {BOOLEAN_LABELS[currentTitle].true}
+                  </option>
+                  <option value="FALSE">
+                    {BOOLEAN_LABELS[currentTitle].false}
+                  </option>
+                </select>
+              ) : (
               <input
                 style={{
                   padding: 8,
@@ -381,6 +423,7 @@ export default function Home() {
                   }
                 }}
               />
+              )}
             </div>
           );
         })}

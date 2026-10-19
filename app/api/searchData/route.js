@@ -45,8 +45,12 @@ export async function POST(req) {
     // Mọi điều kiện đều nối bằng VÀ: chain .eq()/.ilike() trên PostgREST là AND.
     for (const [key, value] of dieuKien) {
       if (laCotBoolean(table, key)) {
-        // 👉 cột boolean: ilike sẽ làm hỏng câu truy vấn, phải so bằng
-        query = query.eq(key, doiSangBoolean(value));
+        // 👉 cột boolean: ilike sẽ làm hỏng câu truy vấn, phải so bằng.
+        // false thì lấy cả dòng NULL (giao diện vẫn hiện NULL là "Không"/"Nữ"),
+        // nên dùng "is not true" thay vì eq false.
+        query = doiSangBoolean(value)
+          ? query.eq(key, true)
+          : query.not(key, "is", true);
       } else if (!fuzzy || key === "SOHOK") {
         // 👉 exact match
         query = query.eq(key, value);
@@ -82,6 +86,12 @@ export async function POST(req) {
     // lọc theo ô phân loại có thể khớp hàng trăm dòng, mức 100 cũ sẽ cắt cụt
     // kết quả mà người dùng không hề biết.
     query = query.limit(GIOI_HAN_KET_QUA);
+
+    // 👉 Nhân khẩu còn lên đầu, đã xóa xuống cuối (false < true). Sắp ở máy
+    // chủ để khi chạm trần 1000 dòng thì phần bị cắt là người đã xóa.
+    if (laCotBoolean(table, "DELETED")) {
+      query = query.order("DELETED", { ascending: true });
+    }
 
     const { data, error } = await query;
 
