@@ -20,8 +20,8 @@ export async function POST(res) {
   if (bangLa) return bangLa
 
   // Nhân khẩu không xóa hẳn khỏi bảng: chỉ bật cờ DELETED để còn tra lại được
-  // (giao diện hiện nền xám). `restore: true` là khôi phục. Bảng crime chưa có
-  // cột này nên vẫn xóa thật như cũ.
+  // (giao diện hiện nền xám). `restore: true` là khôi phục. Bảng crime và
+  // tamtru (tạm trú không theo dõi đã xóa) thì xóa thật.
   const query = table === "population"
     ? supabaseAdmin.from(table).update({ DELETED: !body.restore })
     : supabaseAdmin.from(table).delete();

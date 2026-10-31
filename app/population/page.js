@@ -60,8 +60,76 @@ const MAU_DA_XOA = { backgroundColor: "#3f3f46", color: "#a1a1aa" };
 // cùng mã màu với app ppv2. Nền sáng nên chữ phải tối mới đọc được.
 const MAU_TIEN_AN = { backgroundColor: "#90CAF9", color: "#0f172a" };
 
+// Hai màn của trang: thường trú và tạm trú. Bảng tạm trú cùng lược đồ với bảng
+// thường trú (thêm cột NGAYDEN) nên dùng chung trang, chỉ khác tên bảng — giống
+// màn "Tìm công dân" của app ppv2. Mở thẳng tạm trú bằng /population?table=tamtru.
+const MODES = [
+  { table: "population", label: "Thường trú" },
+  { table: "tamtru", label: "Tạm trú" },
+];
+
+const TITLE = {
+  HOTEN: "HỌ TÊN",
+  GIOITINH: "GIỚI TÍNH",
+  NAMSINH: "NĂM SINH",
+  QUANHE: "QUAN HỆ VỚI CH",
+  SOHOK: "SỐ HSHK",
+  CCCD: "CCCD",
+  DANTOC: "DÂN TỘC",
+  TONGIAO: "TÔN GIÁO",
+  NOITHTRU: "ĐỊA CHỈ",
+  NOIOHIENTAI: "NƠI Ở HIỆN TẠI",
+  TENCHA: "TÊN CHA",
+  TENME: "TÊN MẸ",
+  SDT: "SĐT",
+  VANGNHA: "VẮNG NHÀ",
+  CRIMINALRECORD: "TIỀN ÁN/TIỀN SỰ",
+  GHICHU: "GHI CHÚ",
+  LOCATION: "TOẠ ĐỘ",
+};
+
+// Tạm trú: đúng các cột của bảng tamtru (sql/tao-bang-tamtru.sql). Không có
+// cha/mẹ, dân tộc, tôn giáo, SĐT, vắng nhà, tiền án, đã xóa (xóa tạm trú là xóa
+// hẳn dòng); SOHOK là CCCD chủ hộ dựng ra để app gom hộ nên
+// không hiện (xem replaceBieuMau). NOITHTRU là thường trú ở quê,
+// NOITAMTRU là chỗ đang tạm trú.
+const TITLE_TAMTRU = {
+  HOTEN: "HỌ TÊN",
+  GIOITINH: "GIỚI TÍNH",
+  NAMSINH: "NĂM SINH",
+  CCCD: "CCCD",
+  NOITAMTRU: "NƠI TẠM TRÚ",
+  NOITHTRU: "NƠI THƯỜNG TRÚ",
+  NGAYDEN: "NGÀY ĐẾN",
+  GHICHU: "GHI CHÚ",
+  LOCATION: "TOẠ ĐỘ",
+};
+
 export default function Home() {
   const router = useRouter();
+
+  const [table, setTable] = useState("population");
+  const laTamTru = table === "tamtru";
+
+  // Đọc ?table= sau khi mount, không dùng useSearchParams để khỏi phải bọc
+  // Suspense cho bản build tĩnh.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("table");
+    if (MODES.some((m) => m.table === t)) setTable(t);
+  }, []);
+
+  function doiBang(t) {
+    if (t === table) return;
+    setTable(t);
+    setData([]);
+    setFixDataIndex(null);
+    setNewFixData([]);
+    setNewData(null);
+    const url = new URL(window.location.href);
+    if (t === "population") url.searchParams.delete("table");
+    else url.searchParams.set("table", t);
+    window.history.replaceState(null, "", url);
+  }
 
   const [data, setData] = useState([]);
   const [input1, setInput1] = useState("");
@@ -84,25 +152,7 @@ export default function Home() {
     Object.fromEntries(Object.keys(FLAG_LABELS).map((k) => [k, false])),
   );
 
-  const title = {
-    HOTEN: "HỌ TÊN",
-    GIOITINH: "GIỚI TÍNH",
-    NAMSINH: "NĂM SINH",
-    QUANHE: "QUAN HỆ VỚI CH",
-    SOHOK: "SỐ HSHK",
-    CCCD: "CCCD",
-    DANTOC: "DÂN TỘC",
-    TONGIAO: "TÔN GIÁO",
-    NOITHTRU: "ĐỊA CHỈ",
-    NOIOHIENTAI: "NƠI Ở HIỆN TẠI",
-    TENCHA: "TÊN CHA",
-    TENME: "TÊN MẸ",
-    SDT: "SĐT",
-    VANGNHA: "VẮNG NHÀ",
-    CRIMINALRECORD: "TIỀN ÁN/TIỀN SỰ",
-    GHICHU: "GHI CHÚ",
-    LOCATION: "TOẠ ĐỘ",
-  };
+  const title = laTamTru ? TITLE_TAMTRU : TITLE;
 
   // Danh sách cột cho ô "Chọn Dữ liệu": bỏ các cột đã có ô bấm riêng và các
   // cột không tìm theo được.
@@ -110,7 +160,7 @@ export default function Home() {
     ...Object.keys(title).filter(
       (k) => !(k in FLAG_LABELS) && !KHONG_TIM.includes(k),
     ),
-    ...Object.keys(CHI_TIM),
+    ...(laTamTru ? [] : Object.keys(CHI_TIM)),
   ];
   const searchLabel = (k) => title[k] ?? CHI_TIM[k];
 
@@ -132,7 +182,9 @@ export default function Home() {
       themDieuKien(select2, input2);
       themDieuKien(select3, input3);
 
-      const flagsBat = Object.values(flags).some(Boolean);
+      // Bảng tamtru không có cột phân loại (CRIMINALRECORD) — không gửi ô bấm.
+      const flagsGui = laTamTru ? {} : flags;
+      const flagsBat = Object.values(flagsGui).some(Boolean);
       if (filters.length === 0 && !flagsBat) {
         alert("Vui lòng nhập ít nhất một điều kiện tìm kiếm!");
         return;
@@ -142,9 +194,9 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          database: "population",
+          database: table,
           criteria: filters,
-          flags,
+          flags: flagsGui,
           fuzzy: true,
         }),
       });
@@ -187,12 +239,15 @@ export default function Home() {
             BOOLEAN_LABELS[key].true.toUpperCase();
       }
     }
+    // Người tạm trú thêm tay tự thành một hộ (SOHOK = CCCD), để màn Thông tin
+    // hộ của app vẫn gom được — giống quy ước của file nhập.
+    if (laTamTru && !newDataConvert.SOHOK) newDataConvert.SOHOK = newDataConvert.CCCD;
 
     let supabase = await fetch("/api/addData", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        database: "population",
+        database: table,
         newData: newDataConvert,
       }),
     });
@@ -209,13 +264,22 @@ export default function Home() {
   // Xóa mềm: máy chủ chỉ bật DELETED, dòng vẫn ở lại bảng (nền xám).
   // `restore` = true là khôi phục lại.
   async function deleteData(cccd, restore = false) {
-    if (!restore && !confirm("Đánh dấu nhân khẩu này là ĐÃ XÓA?")) return;
+    // Tạm trú không có cờ DELETED: xóa là xóa hẳn dòng (máy chủ xử lý).
+    if (
+      !restore &&
+      !confirm(
+        laTamTru
+          ? "Xóa hẳn người tạm trú này? Không khôi phục được."
+          : "Đánh dấu nhân khẩu này là ĐÃ XÓA?",
+      )
+    )
+      return;
 
     const res = await fetch("/api/deleteData", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        database: "population",
+        database: table,
         CCCD: cccd,
         restore,
       }),
@@ -229,6 +293,11 @@ export default function Home() {
       return;
     }
 
+    if (laTamTru) {
+      alert("Đã xóa người tạm trú");
+      setData(data.filter((item) => item.CCCD !== cccd));
+      return;
+    }
     alert(restore ? "Đã khôi phục nhân khẩu" : "Đã đánh dấu nhân khẩu đã xóa");
     setData(
       data &&
@@ -247,7 +316,7 @@ export default function Home() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        database: "population",
+        database: table,
         CCCD: cccd,
         newData: fixItem,
       }),
@@ -293,6 +362,38 @@ export default function Home() {
           >
             CÔNG CỤ TÌM KIẾM DÂN CƯ
           </div>
+
+          {/* Chuyển giữa thường trú và tạm trú */}
+          <div
+            style={{
+              display: "inline-flex",
+              border: "1px solid #475569",
+              borderRadius: 8,
+              overflow: "hidden",
+            }}
+          >
+            {MODES.map((m) => {
+              const on = table === m.table;
+              return (
+                <button
+                  key={m.table}
+                  type="button"
+                  onClick={() => doiBang(m.table)}
+                  style={{
+                    padding: "8px 22px",
+                    fontSize: 15,
+                    fontWeight: on ? 700 : 500,
+                    cursor: "pointer",
+                    border: "none",
+                    backgroundColor: on ? "#93c5fd" : "#1e293b",
+                    color: on ? "#0f172a" : "#cbd5e1",
+                  }}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Ô PHÂN LOẠI — bấm để lọc, không bấm ô nào thì tìm tất cả */}
@@ -305,7 +406,7 @@ export default function Home() {
             justifyContent: "center",
           }}
         >
-          {Object.keys(FLAG_LABELS).map((field) => {
+          {!laTamTru && Object.keys(FLAG_LABELS).map((field) => {
             const on = flags[field];
             return (
               <button
@@ -716,8 +817,9 @@ export default function Home() {
                       >
                         {item.DELETED ? "Khôi phục" : "Xóa"}
                       </button>
-                      {/* ✅ NÚT TẠO HỒ SƠ MỚI */}
-                      <button
+                      {/* ✅ NÚT TẠO HỒ SƠ MỚI — biểu mẫu chỉ lấy dữ liệu
+                          thường trú (bảng population) nên ẩn ở màn tạm trú */}
+                      {!laTamTru && <button
                         onClick={() =>
                           router.push(`/generatedocs?cccd=${item.CCCD}`)
                         }
@@ -731,7 +833,7 @@ export default function Home() {
                         }}
                       >
                         📄 Hồ sơ
-                      </button>
+                      </button>}
                     </td>
                   </tr>
                 ),
@@ -838,24 +940,34 @@ export default function Home() {
         <div style={{ marginTop: 20 }}>
           <button
             onClick={() =>
-              setNewData({
-                HOTEN: "",
-                NAMSINH: "",
-                GIOITINH: "",
-                DANTOC: "",
-                TONGIAO: "",
-                CCCD: "",
-                SOHOK: "",
-                NOITHTRU: "",
-                NOIOHIENTAI: "",
-                TENCHA: "",
-                TENME: "",
-                SDT: "",
-                VANGNHA: false,
-                CRIMINALRECORD: false,
-                GHICHU: "",
-                LOCATION: "",
-              })
+              setNewData(
+                // Tạm trú chỉ có các cột đang hiện; thường trú giữ đủ như cũ.
+                laTamTru
+                  ? Object.fromEntries(
+                      Object.keys(TITLE_TAMTRU).map((k) => [
+                        k,
+                        BOOLEAN_LABELS[k] && k !== "GIOITINH" ? false : "",
+                      ]),
+                    )
+                  : {
+                      HOTEN: "",
+                      NAMSINH: "",
+                      GIOITINH: "",
+                      DANTOC: "",
+                      TONGIAO: "",
+                      CCCD: "",
+                      SOHOK: "",
+                      NOITHTRU: "",
+                      NOIOHIENTAI: "",
+                      TENCHA: "",
+                      TENME: "",
+                      SDT: "",
+                      VANGNHA: false,
+                      CRIMINALRECORD: false,
+                      GHICHU: "",
+                      LOCATION: "",
+                    },
+              )
             }
             style={{
               backgroundColor: "#16a34a",

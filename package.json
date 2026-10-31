@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "dong-goi:mac": "node scripts/dong-goi.mjs --mac",
-    "dong-goi:win": "node scripts/dong-goi.mjs --windows"
+    "dong-goi:win": "node scripts/dong-goi.mjs --windows",
+    "nhap-tamtru": "node scripts/nhap-tamtru.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
